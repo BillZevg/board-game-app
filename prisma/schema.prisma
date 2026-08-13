@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum LocationType {
+  STORE
+}
+
+enum EventStatus {
+  OPEN
+  FULL
+  CANCELLED
+  COMPLETED
+}
+
+enum ParticipantStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model User {
+  id        String   @id
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  city      String?
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hostedEvents   Event[]       @relation("HostedEvents")
+  participations Participant[]
+  messages       ChatMessage[]
+
+  @@map("users")
+}
+
+model Game {
+  id          String   @id @default(cuid())
+  bggId       Int?     @unique
+  title       String
+  description String?  @db.Text
+  imageUrl    String?
+  minPlayers  Int
+  maxPlayers  Int
+  createdAt   DateTime @default(now())
+
+  events Event[]
+
+  @@map("games")
+}
+
+model Event {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?      @db.Text
+  dateTime     DateTime
+  locationType LocationType @default(STORE)
+  city         String
+  address      String?
+  maxPlayers   Int
+  status       EventStatus  @default(OPEN)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  hostId String
+  host   User   @relation("HostedEvents", fields: [hostId], references: [id], onDelete: Cascade)
+
+  gameId String?
+  game   Game?   @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
+  participants Participant[]
+  messages     ChatMessage[]
+
+  @@index([city, status])
+  @@index([dateTime])
+  @@map("events")
+}
+
+model Participant {
+  id        String            @id @default(cuid())
+  status    ParticipantStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("participants")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
+  @@map("chat_messages")
+}
