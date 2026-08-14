@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { SignInButton } from "@clerk/nextjs";
 
 export default async function HomePage() {
+  // 1. Στο Next.js 15 / Clerk v5+ το auth() είναι async
   const { userId } = await auth();
 
   const events = await prisma.event.findMany({
@@ -20,7 +21,6 @@ export default async function HomePage() {
       {/* --- HERO BANNER FOR GEEKS --- */}
       {!userId && (
         <section className="relative overflow-hidden bg-gradient-to-b from-indigo-950 via-slate-900 to-slate-950 border-b border-indigo-900/40 py-20 px-4 text-center">
-          {/* Background Ambient Glow */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-purple-600/20 blur-[120px] rounded-full pointer-events-none" />
 
           <div className="relative max-w-4xl mx-auto space-y-6">
@@ -98,16 +98,9 @@ export default async function HomePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {events.map((event) => {
-              const eventDate = new Date(event.dateTime).toLocaleDateString(
-                "el-GR",
-                {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                },
-              );
+              // ISO string formatting για αποφυγή Server/Client Hydration Mismatch
+              const d = new Date(event.dateTime);
+              const formattedDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} - ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
               const isFull = event._count.participants >= event.maxPlayers;
 
@@ -116,32 +109,27 @@ export default async function HomePage() {
                   key={event.id}
                   className="group relative bg-slate-900/80 border border-slate-800 hover:border-purple-500/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:shadow-purple-900/20 transition-all duration-300 flex flex-col justify-between overflow-hidden backdrop-blur-sm"
                 >
-                  {/* Top Ambient Highlight */}
                   <div className="absolute -top-12 -right-12 w-24 h-24 bg-purple-500/10 blur-2xl group-hover:bg-purple-500/20 transition" />
 
                   <div>
-                    {/* Header: Location & Time */}
                     <div className="flex justify-between items-center mb-4">
                       <span className="px-3 py-1 text-xs font-mono font-medium bg-slate-800 text-purple-300 rounded-lg border border-purple-500/20 flex items-center gap-1">
                         📍 {event.city || "Board Game Cafe"}
                       </span>
                       <span className="text-xs font-mono text-slate-400">
-                        🕒 {eventDate}
+                        🕒 {formattedDate}
                       </span>
                     </div>
 
-                    {/* Title */}
                     <h3 className="text-xl font-extrabold text-white mb-2 group-hover:text-purple-300 transition line-clamp-1">
                       {event.title}
                     </h3>
 
-                    {/* Description */}
                     <p className="text-slate-400 text-sm line-clamp-2 mb-6 leading-relaxed">
                       {event.description || "Δεν έχει προστεθεί περιγραφή..."}
                     </p>
                   </div>
 
-                  {/* Footer: Slots & Action */}
                   <div className="pt-4 border-t border-slate-800/80 flex justify-between items-center text-xs">
                     <span
                       className={`font-mono font-semibold px-2.5 py-1 rounded-md ${

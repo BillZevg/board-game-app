@@ -1,18 +1,33 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import Header from "@/components/Header"; // ή η δική σας διαδρομή
+import Header from "@/components/Header";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { Suspense } from "react";
+
+export const metadata = {
+  title: "Tabletop Tavern",
+  description: "Βρες την επόμενη παρέα σου για board games & TRPGs!",
+};
 
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
       <html lang="el" suppressHydrationWarning>
         <body
-          className="antialiased min-h-screen bg-gray-50"
+          className="antialiased min-h-screen bg-slate-950 text-slate-100"
           suppressHydrationWarning
         >
+          <Suspense
+            fallback={
+              <div className="p-4 text-center text-xs text-slate-500">
+                Loading Tavern...
+              </div>
+            }
+          >
+            <main>{children}</main>
+          </Suspense>
           <Header />
-          {children}
+
           <Toaster position="top-right" richColors closeButton />
         </body>
       </html>
