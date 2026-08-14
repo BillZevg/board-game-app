@@ -15,26 +15,25 @@ export default async function CreateEventPage() {
     const { userId: currentUserId } = await auth();
     if (!currentUserId) return;
 
-    // 1. Βρίσκουμε ή δημιουργούμε τον χρήστη στη βάση μας
-    let user = await prisma.user.findUnique({
-      where: { clerkId: currentUserId },
+    // 1. Βρίσκουμε ή δημιουργούμε τον χρήστη με βάση το ID
+    const user = await prisma.user.upsert({
+      where: { id: currentUserId },
+      update: {
+        clerkId: currentUserId,
+      },
+      create: {
+        id: currentUserId,
+        clerkId: currentUserId,
+        email: `${currentUserId}@placeholder.com`,
+        name: "Gamer",
+      },
     });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          clerkId: currentUserId,
-          email: `${currentUserId}@placeholder.com`,
-          name: "Gamer",
-        },
-      });
-    }
 
     // 2. Ανακτώνται & Επαληθεύονται τα δεδομένα της φόρμας
     const title = formData.get("title");
     const description = formData.get("description") || "";
     const city = formData.get("city");
-    const address = formData.get("location") || ""; // Χάρτης στο Prisma πεδίο `address`
+    const address = formData.get("location") || "";
     const rawDateTime = formData.get("dateTime");
     const rawMaxPlayers = formData.get("maxPlayers");
 
@@ -62,7 +61,7 @@ export default async function CreateEventPage() {
           title,
           description,
           city,
-          address, // Χρήση του `address` αντί για `location`
+          address,
           dateTime,
           maxPlayers,
           hostId: user.id,

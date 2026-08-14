@@ -14,9 +14,13 @@ export default function RootLayout({ children }) {
     <ClerkProvider>
       <html lang="el" suppressHydrationWarning>
         <body
-          className="antialiased min-h-screen bg-slate-950 text-slate-100"
+          className="antialiased min-h-screen bg-slate-950 text-slate-100 flex flex-col"
           suppressHydrationWarning
         >
+          {/* 1. Το Header μπαίνει πρώτο στην κορυφή */}
+          <Header />
+
+          {/* 2. Το main παίρνει τον υπόλοιπο χώρο (flex-1) */}
           <Suspense
             fallback={
               <div className="p-4 text-center text-xs text-slate-500">
@@ -24,9 +28,8 @@ export default function RootLayout({ children }) {
               </div>
             }
           >
-            <main>{children}</main>
+            <main className="flex-1">{children}</main>
           </Suspense>
-          <Header />
 
           <Toaster position="top-right" richColors closeButton />
         </body>
