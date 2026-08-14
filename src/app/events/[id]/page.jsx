@@ -16,9 +16,9 @@ export default async function EventDetailPage({ params }) {
   const { id } = await params;
   const { userId: clerkId } = await auth();
 
-  // Φέρνουμε το event, host, participants και τα chat messages
+  // Φέρνουμε το event, host, participants και τα messages (που είναι ChatMessage[])
   const event = await prisma.event.findUnique({
-    where: { id },
+    where: { id: id },
     include: {
       host: true,
       participants: {
@@ -27,6 +27,7 @@ export default async function EventDetailPage({ params }) {
         },
       },
       messages: {
+        // 👈 'messages' βάσει του schema.prisma
         include: {
           user: true,
         },
@@ -115,9 +116,9 @@ export default async function EventDetailPage({ params }) {
           {/* Πληροφορίες Διοργανωτή (Host) */}
           <div className="flex items-center gap-3 pb-6 mb-6 border-b border-slate-800">
             <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-purple-500/50 shrink-0">
-              {event.host?.imageUrl || event.host?.avatarUrl ? (
+              {event.host?.avatarUrl ? (
                 <Image
-                  src={event.host.imageUrl || event.host.avatarUrl}
+                  src={event.host.avatarUrl}
                   alt={event.host.name || "Host"}
                   fill
                   className="object-cover"
@@ -154,11 +155,9 @@ export default async function EventDetailPage({ params }) {
                 📍 Τοποθεσία
               </span>
               <p className="text-slate-200 font-semibold text-sm">
-                {event.locationType === "ONLINE"
-                  ? "🌐 Online Session"
-                  : `${event.address ? `${event.address}, ` : ""}${
-                      event.city || "Δεν έχει οριστεί"
-                    }`}
+                {event.locationType === "STORE"
+                  ? `${event.address ? `${event.address}, ` : ""}${event.city || "Δεν έχει οριστεί"}`
+                  : "🌐 Online Session"}
               </p>
             </div>
 
@@ -235,8 +234,7 @@ export default async function EventDetailPage({ params }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {event.participants.map((attendee) => {
                 const name = attendee.user?.name || "Χρήστης";
-                const avatar =
-                  attendee.user?.imageUrl || attendee.user?.avatarUrl;
+                const avatar = attendee.user?.avatarUrl;
 
                 return (
                   <div

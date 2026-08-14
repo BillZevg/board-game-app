@@ -1,62 +1,109 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useTransition } from "react";
 
-export default function EventFilter() {
+export default function EventFilters({ cities = [] }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const { replace } = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  function handleSearch(term) {
-    const params = new URLSearchParams(searchParams);
-    if (term) {
-      params.set("search", term);
-    } else {
-      params.delete("search");
-    }
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [city, setCity] = useState(searchParams.get("city") || "");
+  const [openOnly, setOpenOnly] = useState(
+    searchParams.get("openOnly") === "true",
+  );
+
+  function handleFilterChange(newSearch, newCity, newOpenOnly) {
+    const params = new URLSearchParams();
+
+    if (newSearch) params.set("search", newSearch);
+    if (newCity) params.set("city", newCity);
+    if (newOpenOnly) params.set("openOnly", "true");
 
     startTransition(() => {
-      replace(`${pathname}?${params.toString()}`);
+      router.push(`/?${params.toString()}`);
     });
   }
 
   return (
-    <div className="mb-8">
-      <div className="relative max-w-2xl mx-auto flex items-center">
-        {/* SVG Εικονίδιο Φακού */}
-        <div className="absolute left-4 top-0 bottom-0 my-auto flex items-center justify-center pointer-events-none">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#9CA3AF"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
+    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 md:p-6 mb-10 shadow-xl backdrop-blur-md">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        {/* Search Input */}
+        <div className="relative">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+            🔍
+          </span>
+          <input
+            type="text"
+            placeholder="Αναζήτηση παιχνιδιού, τίτλου..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              handleFilterChange(e.target.value, city, openOnly);
+            }}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500 transition"
+          />
         </div>
-        {/* Ενιαίο Input Αναζήτησης */}
-        <input
-          type="text"
-          placeholder="Αναζήτηση με τίτλο παιχνιδιού ή πόλη (π.χ. Catan, Αθήνα)..."
-          defaultValue={searchParams.get("search")?.toString()}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="w-full pl-11 pr-10 py-3.5 bg-white border border-gray-200 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-        />
 
-        {/* Loader κατά την πληκτρολόγηση */}
-        {isPending && (
-          <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
-            <span className="animate-spin text-xs text-blue-600">⏳</span>
-          </div>
-        )}
+        {/* City Filter */}
+        <div className="relative">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+            📍
+          </span>
+          <select
+            value={city}
+            onChange={(e) => {
+              setCity(e.target.value);
+              handleFilterChange(search, e.target.value, openOnly);
+            }}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-purple-500 transition cursor-pointer appearance-none"
+          >
+            <option value="">Όλες οι Πόλεις</option>
+            {cities.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Toggle Open Slots Only */}
+        <div className="flex items-center justify-between md:justify-end gap-3">
+          <label className="flex items-center gap-2 text-xs font-mono text-slate-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={openOnly}
+              onChange={(e) => {
+                setOpenOnly(e.target.checked);
+                handleFilterChange(search, city, e.target.checked);
+              }}
+              className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-purple-600 focus:ring-purple-500 focus:ring-offset-slate-900 cursor-pointer"
+            />
+            <span>🟢 Μόνο διαθέσιμες θέσεις</span>
+          </label>
+
+          {(search || city || openOnly) && (
+            <button
+              onClick={() => {
+                setSearch("");
+                setCity("");
+                setOpenOnly(false);
+                router.push("/");
+              }}
+              className="text-xs text-slate-400 hover:text-purple-400 underline transition"
+            >
+              Καθαρισμός
+            </button>
+          )}
+        </div>
       </div>
+
+      {isPending && (
+        <div className="text-center text-xs text-purple-400 mt-2 font-mono animate-pulse">
+          Αναζήτηση...
+        </div>
+      )}
     </div>
   );
 }

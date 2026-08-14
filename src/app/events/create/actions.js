@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -9,30 +9,57 @@ import { redirect } from "next/navigation";
  * 1. Αποστολή μηνύματος στο Tavern Chat
  */
 export async function sendChatMessage(eventId, text) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId || !text?.trim()) return null;
+  try {
+    const { userId: clerkId } = await auth();
+    const clerkUser = await currentUser();
 
-  // Βρίσκουμε τον χρήστη στη βάση δεδομένων
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-  });
+    if (!clerkId) {
+      console.error(" ❌ Chat Error: Ο χρήστης δεν είναι συνδεδεμένος.");
+      return { success: false, error: "Unauthorized" };
+    }
 
-  if (!user) return null;
+    if (!text || text.trim() === "") {
+      return { success: false, error: "Empty message" };
+    }
 
-  // Δημιουργία του μηνύματος
-  const newMessage = await prisma.chatMessage.create({
-    data: {
-      text: text.trim(),
-      eventId,
-      userId: user.id,
-    },
-    include: {
-      user: true,
-    },
-  });
+    // Βρίσκουμε ή δημιουργπούμε τον χρήστη στη βάση δεδομένων (Prisma Sync)
+    const dbUser = await prisma.user.upsert({
+      where: { clerkId: clerkId },
+      update: {
+        name: clerkUser?.firstName
+          ? `${clerkUser.firstName} ${clerkUser.lastName || ""}`.trim()
+          : clerkUser?.username || "Gamer",
+        avatarUrl: clerkUser?.imageUrl || null,
+      },
+      create: {
+        clerkId: clerkId,
+        email:
+          clerkUser?.emailAddresses[0]?.emailAddress ||
+          `${clerkId}@placeholder.com`,
+        name: clerkUser?.firstName
+          ? `${clerkUser.firstName} ${clerkUser.lastName || ""}`.trim()
+          : clerkUser?.username || "Gamer",
+        avatarUrl: clerkUser?.imageUrl || null,
+      },
+    });
 
-  revalidatePath(`/events/${eventId}`);
-  return newMessage;
+    const newMessage = await prisma.chatMessage.create({
+      data: {
+        content: text.trim(),
+        eventId: eventId,
+        userId: dbUser.id,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    revalidatePath(`/events/${eventId}`);
+    return { success: true, message: newMessage };
+  } catch (error) {
+    console.error("Σφάλμα κατά την αποστολή μηνύματος στο Chat:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 /**

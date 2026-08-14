@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export default function EventChat({
   eventId,
-  messages: initialMessages,
+  messages: initialMessages = [],
   currentUserId,
   hostId,
   sendMessageAction,
@@ -14,6 +15,16 @@ export default function EventChat({
   const [text, setText] = useState("");
   const [isPending, startTransition] = useTransition();
   const chatEndRef = useRef(null);
+  const router = useRouter();
+
+  // Polling: Αυτόματη ανανέωση δεδομένων από τον Server καθε 4 δευτερόλεπτα
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [router]);
 
   //   Auto scroll στο τελευταίο μήνυμα
   const scrollToBottom = () => {
@@ -32,9 +43,18 @@ export default function EventChat({
     setText("");
 
     startTransition(async () => {
-      const newMessage = await sendMessageAction(messageText);
-      if (newMessage) {
-        setMessages((prev) => [...prev, newMessage]);
+      try {
+        const res = await sendMessageAction(eventId, messageText);
+        if (res?.success && res.message) {
+          setMessages((prev) => [...prev, res.message]);
+        } else if (res && !res.success) {
+          console.error("Chat Server Error:", res.error);
+        } else if (res) {
+          setMessages((prev) => [...prev, res]);
+        }
+        router.refresh();
+      } catch (error) {
+        console.error("Error sending message:", error);
       }
     });
   };
@@ -77,13 +97,24 @@ export default function EventChat({
             </p>
           </div>
         ) : (
-          messages.map((msg) => {
-            const isMe = msg.userId === currentUserId;
-            const isHost = msg.userId === hostId;
+          messages.map((msg, index) => {
+            const isMe =
+              msg.userId === currentUserId ||
+              msg.user?.clerkId === currentUserId ||
+              msg.user?.id === currentUserId;
+
+            const isHost =
+              msg.userId === hostId ||
+              msg.user?.clerkId === hostId ||
+              msg.user?.id === hostId;
+
+            const messageContent = msg.content || msg.text || "";
+
+            const messageKey = msg.id || `msg-${msg.createdAt || index}`;
 
             return (
               <div
-                key={msg.id}
+                key={messageKey}
                 className={`flex items-start gap-3 ${
                   isMe ? "flex-row-reverse" : "flex-row"
                 }`}
@@ -95,6 +126,7 @@ export default function EventChat({
                       src={msg.user.imageUrl}
                       alt={msg.user.name || "User"}
                       fill
+                      sizes="32px"
                       className="object-cover"
                     />
                   ) : (
@@ -141,7 +173,7 @@ export default function EventChat({
                         : "bg-slate-950/90 text-slate-200 border border-slate-800 rounded-tl-none font-medium"
                     }`}
                   >
-                    {msg.text}
+                    {messageContent}
                   </div>
                 </div>
               </div>
@@ -170,7 +202,7 @@ export default function EventChat({
           disabled={!text.trim() || isPending}
           className="px-5 py-3 bg-gradient-to-r border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition disabled:opacity-50 font-medium"
         >
-          <span>{isPending ? "..." : "Στοιχείο"}</span>
+          <span>{isPending ? "..." : "Αποστολή"}</span>
           <span className="text-sm">🚀</span>
         </button>
       </form>

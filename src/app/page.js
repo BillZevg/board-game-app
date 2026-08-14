@@ -2,19 +2,50 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { SignInButton } from "@clerk/nextjs";
+import EventFilters from "@/components/EventFilters";
 
-export default async function HomePage() {
-  // 1. Στο Next.js 15 / Clerk v5+ το auth() είναι async
+export default async function HomePage({ searchParams }) {
+  // 1. Στο Next.js 15 / Clerk v5+ το auth() και searchParams είναι async
   const { userId } = await auth();
+  const params = await searchParams;
 
-  const events = await prisma.event.findMany({
+  const search = params?.search || "";
+  const city = params?.city || "";
+  const openOnly = params?.openOnly === "true";
+
+  // 2. Δυναμικό φιλτράρισμα Prisma
+  const rawEvents = await prisma.event.findMany({
+    where: {
+      AND: [
+        search
+          ? {
+              OR: [
+                { title: { contains: search, mode: "insensitive" } },
+                { description: { contains: search, mode: "insensitive" } },
+              ],
+            }
+          : {},
+        city ? { city: { equals: city, mode: "insensitive" } } : {},
+      ],
+    },
     orderBy: { dateTime: "asc" },
-    take: 6,
     include: {
       host: true,
       _count: { select: { participants: true } },
     },
   });
+
+  // Φιλτράρισμα μόνο για ανοιχτά slots αν είναι επιλεγμένο το checkbox
+  const events = openOnly
+    ? rawEvents.filter((e) => e._count.participants < e.maxPlayers)
+    : rawEvents;
+
+  // Λίστα μοναδικών πόλεων για το dropdown φίλτρο
+  const allCities = await prisma.event.findMany({
+    select: { city: true },
+    distinct: ["city"],
+  });
+  const citiesList = allCities.map((e) => e.city).filter(Boolean);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-16">
@@ -61,7 +92,7 @@ export default async function HomePage() {
 
       {/* --- MAIN EVENTS GRID --- */}
       <main className="max-w-7xl mx-auto px-4 pt-12">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-slate-800 pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-800 pb-4">
           <div>
             <h2 className="text-2xl font-black tracking-wide text-white flex items-center gap-2">
               <span className="text-purple-400">🛡️</span> Ανοιχτά Τραπέζια
@@ -81,10 +112,13 @@ export default async function HomePage() {
           )}
         </div>
 
+        {/* --- EVENT FILTERS COMPONENT --- */}
+        <EventFilters cities={citiesList} />
+
         {events.length === 0 ? (
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center backdrop-blur-md">
             <p className="text-slate-400 text-lg mb-4">
-              🧙‍♂️ Δεν βρέθηκαν ενεργά τραπέζια...
+              🧙‍♂️ Δεν βρέθηκαν ενεργά τραπέζια με αυτά τα κριτήρια...
             </p>
             {userId && (
               <Link
@@ -98,7 +132,6 @@ export default async function HomePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {events.map((event) => {
-              // ISO string formatting για αποφυγή Server/Client Hydration Mismatch
               const d = new Date(event.dateTime);
               const formattedDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} - ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
