@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import DatePicker from "@/components/DateTimePicker";
 
 export default async function CreateEventPage() {
   const { userId } = await auth();
@@ -166,12 +167,7 @@ export default async function CreateEventPage() {
                 <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-2">
                   🕒 Ημερομηνία & Ώρα *
                 </label>
-                <input
-                  type="datetime-local"
-                  name="dateTime"
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm color-scheme-dark"
-                />
+                <DatePicker name="dateTime" required />
               </div>
 
               <div>
