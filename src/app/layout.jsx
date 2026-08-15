@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { Suspense } from "react";
@@ -30,6 +31,9 @@ export default function RootLayout({ children }) {
           >
             <main className="flex-1">{children}</main>
           </Suspense>
+
+          {/* 3. Το Footer μπαίνει στο κάτω μέρος */}
+          <Footer />
 
           <Toaster position="top-right" richColors closeButton />
         </body>

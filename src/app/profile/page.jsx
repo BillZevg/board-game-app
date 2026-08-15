@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import ProfileTermsBox from "@/components/ProfileTermsBox";
 
 export default async function ProfilePage() {
   const { userId: clerkId } = await auth();
@@ -120,6 +121,8 @@ export default async function ProfilePage() {
             </div>
           </div>
         </div>
+
+        <ProfileTermsBox initialAccepted={Boolean(dbUser?.acceptedTerms)} />
 
         {/* --- HOSTED EVENTS SECTION --- */}
         <section className="space-y-4">
