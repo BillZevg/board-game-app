@@ -138,7 +138,7 @@ export default async function HomePage({ searchParams }) {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-800 pb-4">
           <div>
             <h2 className="text-2xl font-black tracking-wide text-white flex items-center gap-2">
-              <span className="text-purple-400">🛡️</span> Όλα τα Τραπέζια
+              <span className="text-purple-400">👾</span> Όλα τα Τραπέζια
             </h2>
             <p className="text-slate-400 text-sm">
               Εξερεύνησε τα ενεργά, ζωντανά & ολοκληρωμένα quest sessions της

@@ -82,7 +82,7 @@ export default async function ProfilePage() {
             <div className="space-y-4 text-center sm:text-left flex-1">
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/30 text-purple-300 text-xs font-mono mb-2">
-                  <span>🛡️ Verified Gamer</span>
+                  <span>🧝 Verified Gamer</span>
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300">
                   {clerkUser?.fullName || clerkUser?.username || "Gamer"}
