@@ -1,23 +1,7 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
-// Ορίζουμε ποιες σελίδες είναι ΔΗΜΟΣΙΕΣ (προσβάσιμες χωρίς login)
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sessions(.*)", // 👈 Επιτρέπει την πρόσβαση σε όλα τα sessions!
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/webhooks/clerk(.*)",
-]);
-
-const clerkHandler = clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
-  }
-});
-
-export default function proxy(req, evt) {
-  return clerkHandler(req, evt);
-}
+// Απευθείας export του clerkMiddleware
+export default clerkMiddleware();
 
 export const config = {
   matcher: [
