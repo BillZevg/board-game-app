@@ -8,6 +8,11 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 enum LocationType {
   STORE
 }
@@ -28,6 +33,23 @@ enum ParticipantStatus {
   NO_SHOW   // 👈 Νέο status: Δεν εμφανίστηκε στο event
 }
 
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  targetId   String
+  targetType String       // π.χ. "EVENT", "USER", "MESSAGE"
+  reason     String
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
 model User {
   id             String        @id @default(cuid())
   clerkId        String        @unique
@@ -40,6 +62,7 @@ model User {
   acceptedTerms  Boolean       @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  role           Role          @default(USER)
 
   // 👈 Νέα Πεδία για το BGG
   bggId        String?

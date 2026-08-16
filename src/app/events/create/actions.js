@@ -1,9 +1,12 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { pusherServer } from "@/lib/pusher";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { chatMessageSchema, eventSchema } from "@/lib/validations/schemas";
+import { chatRateLimit, generalRateLimit } from "@/lib/ratelimit";
 
 /**
  * Helper: Finds or creates user in DB.
@@ -86,33 +89,57 @@ export async function createEvent(data) {
       };
     }
 
-    const title = (data.title || data.get?.("title"))?.toString().trim();
-    const description =
-      (data.description || data.get?.("description"))?.toString().trim() ||
-      null;
-    const city =
-      (data.city || data.get?.("city"))?.toString().trim() || "Αθήνα";
-    const address =
-      (data.address || data.get?.("address"))?.toString().trim() || null;
-    const rawDateTime = data.dateTime || data.get?.("dateTime");
-    const dateTime = rawDateTime ? new Date(rawDateTime) : new Date();
-    const maxPlayers = parseInt(
-      data.maxPlayers || data.get?.("maxPlayers") || 4,
-      10,
-    );
+    // 🛡️ 1. Rate Limiting Check
+    const { success: rateLimitOk } = await generalRateLimit.limit(dbUser.id);
+    if (!rateLimitOk) {
+      return {
+        success: false,
+        error:
+          "Δημιουργείτε τραπέζια πολύ γρήγορα. Παρακαλώ περιμένετε 1 λεπτό.",
+      };
+    }
 
-    if (!title) {
-      return { success: false, error: "Ο τίτλος είναι υποχρεωτικός." };
+    // Εξαγωγή δεδομένων
+    const rawData = {
+      title: (data.title || data.get?.("title"))?.toString().trim(),
+      description:
+        (data.description || data.get?.("description"))?.toString().trim() ||
+        null,
+      city: (data.city || data.get?.("city"))?.toString().trim() || "Αθήνα",
+      address:
+        (data.address || data.get?.("address"))?.toString().trim() || null,
+      dateTime:
+        data.dateTime || data.get?.("dateTime") || new Date().toISOString(),
+      maxPlayers: parseInt(
+        data.maxPlayers || data.get?.("maxPlayers") || 4,
+        10,
+      ),
+    };
+
+    // 🛡️ 2. Input Validation με Zod
+    const validation = eventSchema.safeParse({
+      title: rawData.title,
+      description: rawData.description || "Χωρίς περιγραφή.",
+      location: `${rawData.city}, ${rawData.address || ""}`.trim(),
+      maxParticipants: rawData.maxPlayers,
+      date: new Date(rawData.dateTime).toISOString(),
+    });
+
+    if (!validation.success) {
+      return {
+        success: false,
+        error: validation.error.errors[0].message,
+      };
     }
 
     const newEvent = await prisma.event.create({
       data: {
-        title,
-        description,
-        city,
-        address,
-        dateTime,
-        maxPlayers,
+        title: rawData.title,
+        description: rawData.description,
+        city: rawData.city,
+        address: rawData.address,
+        dateTime: new Date(rawData.dateTime),
+        maxPlayers: rawData.maxPlayers,
         locationType: "STORE",
         status: "OPEN",
         hostId: dbUser.id,
@@ -132,7 +159,7 @@ export async function sendChatMessage(eventId, text) {
     const dbUser = await getOrCreateDbUser();
 
     if (!dbUser) {
-      return { success: false, error: "Unauthorized" };
+      return { success: false, error: "Μη εξουσιοδοτημένος χρήστης." };
     }
 
     if (!dbUser.acceptedTerms) {
@@ -143,14 +170,34 @@ export async function sendChatMessage(eventId, text) {
       };
     }
 
-    if (!text || text.trim() === "") {
-      return { success: false, error: "Empty message" };
+    // 🛡️ 1. Rate Limiting Check
+    const { success: rateLimitOk } = await chatRateLimit.limit(dbUser.id);
+    if (!rateLimitOk) {
+      return {
+        success: false,
+        error: "Στέλνετε μηνύματα πολύ γρήγορα. Παρακαλώ περιμένετε λίγο.",
+      };
     }
+
+    // 🛡️ 2. Input Validation με Zod
+    const validation = chatMessageSchema.safeParse({
+      eventId,
+      content: text,
+    });
+
+    if (!validation.success) {
+      return {
+        success: false,
+        error: validation.error.errors[0].message,
+      };
+    }
+
+    const cleanData = validation.data;
 
     const newMessage = await prisma.chatMessage.create({
       data: {
-        content: text.trim(),
-        eventId: eventId,
+        content: cleanData.content,
+        eventId: cleanData.eventId,
         userId: dbUser.id,
       },
       include: {
@@ -158,7 +205,18 @@ export async function sendChatMessage(eventId, text) {
       },
     });
 
-    revalidatePath(`/events/${eventId}`);
+    // 📡 Εκπομπή του νέου μηνύματος σε πραγματικό χρόνο μέσω Pusher
+    try {
+      await pusherServer.trigger(
+        `event-${cleanData.eventId}`, // Channel Name
+        "new-message", // Event Name
+        newMessage, // Data Payload
+      );
+    } catch (pusherError) {
+      console.error("❌ Σφάλμα Pusher trigger:", pusherError);
+    }
+
+    revalidatePath(`/events/${cleanData.eventId}`);
     return { success: true, message: newMessage };
   } catch (error) {
     console.error("Σφάλμα κατά την αποστολή μηνύματος στο Chat:", error);
@@ -282,7 +340,7 @@ export async function completeEvent(eventId) {
 
     const XP_REWARD = 100;
 
-    // Παιρνουμε ΜΟΝΟ τους εγκεκριμένους (ACCEPTED) παίκτες εκτός από τον Host
+    // Παίρνουμε ΜΟΝΟ τους εγκεκριμένους (ACCEPTED) παίκτες εκτός από τον Host
     const acceptedParticipantUserIds = event.participants
       .filter((p) => p.status === "ACCEPTED" && p.userId !== event.host.id)
       .map((p) => p.userId);

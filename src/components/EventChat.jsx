@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Pusher from "pusher-js";
 import { getUserRank } from "@/lib/badges";
 
 export default function EventChat({
@@ -18,15 +18,33 @@ export default function EventChat({
   const [errorMessage, setErrorMessage] = useState(null);
   const [isPending, startTransition] = useTransition();
   const chatEndRef = useRef(null);
-  const router = useRouter();
 
-  // Polling: Αυτόματη ανανέωση δεδομένων από τον Server κάθε 4 δευτερόλεπτα
+  // 📡 Real-time Subscription με Pusher
   useEffect(() => {
-    const interval = setInterval(() => {
-      router.refresh();
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [router]);
+    // Αρχικοποίηση Pusher Client
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+    });
+
+    // Subscribe στο κανάλι του συγκεκριμένου event
+    const channel = pusher.subscribe(`event-${eventId}`);
+
+    // Ακρόαση για νέα μηνύματα
+    channel.bind("new-message", (newMessage) => {
+      setMessages((prev) => {
+        // Αποφυγή διπλότυπων μηνυμάτων αν έχει προστεθεί ήδη το ID
+        if (prev.some((msg) => msg.id === newMessage.id)) return prev;
+        return [...prev, newMessage];
+      });
+    });
+
+    // Cleanup κατά το unmount
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
+      pusher.disconnect();
+    };
+  }, [eventId]);
 
   // Auto scroll στο τελευταίο μήνυμα
   const scrollToBottom = () => {
@@ -48,16 +66,17 @@ export default function EventChat({
     startTransition(async () => {
       try {
         const res = await sendMessageAction(eventId, messageText);
+
         if (res?.success && res.message) {
-          setMessages((prev) => [...prev, res.message]);
+          setMessages((prev) => {
+            if (prev.some((msg) => msg.id === res.message.id)) return prev;
+            return [...prev, res.message];
+          });
         } else if (res && !res.success) {
           // 🛡️ Εμφάνιση του σφάλματος από τον Gatekeeper/Server στο UI
           setErrorMessage(res.error);
           setText(messageText); // Επαναφορά του text για να μην το ξαναγράφει ο χρήστης
-        } else if (res) {
-          setMessages((prev) => [...prev, res]);
         }
-        router.refresh();
       } catch (error) {
         console.error("Error sending message:", error);
         setErrorMessage(
@@ -80,7 +99,7 @@ export default function EventChat({
           <span className="text-2xl">💬</span>
           <div>
             <span className="text-[10px] font-mono text-purple-400 uppercase tracking-widest block">
-              Party Channel
+              Party Channel • Realtime
             </span>
             <h3 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300 text-lg">
               Tavern Chat
@@ -89,7 +108,7 @@ export default function EventChat({
         </div>
         <span className="text-xs font-mono text-cyan-400 bg-cyan-950/60 px-3 py-1 rounded-full border border-cyan-800/50 flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          Members Only
+          Live
         </span>
       </div>
 
@@ -132,9 +151,9 @@ export default function EventChat({
               >
                 {/* Avatar */}
                 <div className="relative w-8 h-8 rounded-full overflow-hidden shrink-0 border border-purple-500/30 shadow-md">
-                  {msg.user?.imageUrl ? (
+                  {msg.user?.avatarUrl || msg.user?.imageUrl ? (
                     <Image
-                      src={msg.user.imageUrl}
+                      src={msg.user.avatarUrl || msg.user.imageUrl}
                       alt={msg.user.name || "User"}
                       fill
                       sizes="32px"
