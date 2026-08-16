@@ -3,6 +3,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { deleteEventAdminAction, resolveReportAction } from "./actions";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminDashboardPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
