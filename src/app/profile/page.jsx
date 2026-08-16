@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import ProfileTermsBox from "@/components/ProfileTermsBox";
-import { getReliabilityScore } from "@/lib/reliability"; // 👈 Εισαγωγή της συνάρτησης
+import { getReliabilityScore } from "@/lib/reliability";
+import { getRankProgress, getAllBadgesWithStatus } from "@/lib/badges"; // 👈 Εισαγωγή helpers για Badges/Ranks
 
 export default async function ProfilePage() {
   const { userId: clerkId } = await auth();
@@ -15,15 +16,16 @@ export default async function ProfilePage() {
 
   const clerkUser = await currentUser();
 
-  // Φέρνουμε τον χρήστη από τη βάση μαζί με τα νέα πεδία reliability & events
+  // Φέρνουμε τον χρήστη από τη βάση μαζί με το xp
   const dbUser = await prisma.user.findUnique({
     where: { clerkId },
     select: {
       id: true,
+      xp: true, // 👈 Νέο πεδίο XP
       acceptedTerms: true,
-      attendedCount: true, // 👈 Νέο πεδίο
-      noShowCount: true, // 👈 Νέο πεδίο
-      lateCancelCount: true, // 👈 Νέο πεδίο
+      attendedCount: true,
+      noShowCount: true,
+      lateCancelCount: true,
       hostedEvents: {
         orderBy: { dateTime: "asc" },
         include: {
@@ -43,14 +45,21 @@ export default async function ProfilePage() {
     },
   });
 
+  const userXp = dbUser?.xp || 0;
+
+  // 🛡️ Υπολογισμός Reliability Score
+  const reliability = getReliabilityScore(dbUser);
+
+  // 🏆 Υπολογισμός Rank, Progress & Badges
+  const { currentRank, nextRank, progressPercentage, xpNeeded } =
+    getRankProgress(userXp);
+  const allBadges = getAllBadgesWithStatus(userXp);
+
   const hostedEvents = dbUser?.hostedEvents || [];
   const joinedEvents =
     dbUser?.participations
       ?.map((p) => p.event)
       .filter((e) => e.host.clerkId !== clerkId) || [];
-
-  // 🛡️ Υπολογισμός Reliability Score
-  const reliability = getReliabilityScore(dbUser);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-12 px-4">
@@ -89,9 +98,22 @@ export default async function ProfilePage() {
             {/* Info & Stats */}
             <div className="space-y-4 text-center sm:text-left flex-1">
               <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/30 text-purple-300 text-xs font-mono mb-2">
-                  <span>🧝 Verified Gamer</span>
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-2">
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono border ${currentRank.color}`}
+                  >
+                    <img
+                      src={currentRank.icon}
+                      alt={currentRank.title}
+                      className="w-4 h-4 object-contain"
+                    />
+                    <span>{currentRank.title}</span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-amber-400 bg-amber-950/40 border border-amber-800/50 px-2.5 py-1 rounded-full">
+                    {userXp} XP
+                  </span>
                 </div>
+
                 <h1 className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300">
                   {clerkUser?.fullName || clerkUser?.username || "Gamer"}
                 </h1>
@@ -99,6 +121,29 @@ export default async function ProfilePage() {
                   {clerkUser?.primaryEmailAddress?.emailAddress}
                 </p>
               </div>
+
+              {/* Progress Bar για το Επόμενο Rank */}
+              {nextRank && (
+                <div className="max-w-md bg-slate-950/60 border border-slate-800 p-3 rounded-2xl space-y-1.5">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-400">
+                      Επόμενο Level:{" "}
+                      <strong className="text-slate-200">
+                        {nextRank.title}
+                      </strong>
+                    </span>
+                    <span className="text-amber-400 font-bold">
+                      {xpNeeded} XP ακόμα
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-amber-400 transition-all duration-500 rounded-full"
+                      style={{ width: `${progressPercentage}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Player Stats Badges */}
               <div className="flex flex-wrap justify-center sm:justify-start gap-3 pt-2">
@@ -146,6 +191,42 @@ export default async function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* --- TROPHY CABINET (ALL BADGES) --- */}
+        <section className="space-y-4">
+          <div className="border-b border-slate-800 pb-3">
+            <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+              <span className="text-amber-400">🏆</span> Trophy Cabinet
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {allBadges.map((badge) => (
+              <div
+                key={badge.title}
+                className={`p-3 rounded-2xl border text-center flex flex-col items-center justify-center gap-2 transition-all ${
+                  badge.isUnlocked
+                    ? badge.color
+                    : "opacity-30 grayscale border-slate-800 bg-slate-900/30"
+                }`}
+              >
+                <div className="relative w-10 h-10">
+                  <img
+                    src={badge.icon}
+                    alt={badge.title}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <span className="text-xs font-bold leading-tight">
+                  {badge.title}
+                </span>
+                <span className="text-[10px] font-mono opacity-70">
+                  {badge.minXp} XP
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <ProfileTermsBox initialAccepted={Boolean(dbUser?.acceptedTerms)} />
 

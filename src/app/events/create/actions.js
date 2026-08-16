@@ -6,37 +6,39 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 /**
- * Helper: Βρίσκει ή δημιουργεί τον χρήστη στη βάση (Prisma Sync)
+ * Helper: Finds or creates user in DB.
  */
 async function getOrCreateDbUser() {
   const { userId: clerkId } = await auth();
-  const clerkUser = await currentUser();
-
   if (!clerkId) return null;
 
-  return await prisma.user.upsert({
+  let dbUser = await prisma.user.findUnique({
     where: { clerkId },
-    update: {
-      name: clerkUser?.firstName
-        ? `${clerkUser.firstName} ${clerkUser.lastName || ""}`.trim()
-        : clerkUser?.username || "Gamer",
-      avatarUrl: clerkUser?.imageUrl || null,
-    },
-    create: {
-      clerkId,
-      email:
-        clerkUser?.emailAddresses[0]?.emailAddress ||
-        `${clerkId}@placeholder.com`,
-      name: clerkUser?.firstName
-        ? `${clerkUser.firstName} ${clerkUser.lastName || ""}`.trim()
-        : clerkUser?.username || "Gamer",
-      avatarUrl: clerkUser?.imageUrl || null,
-    },
   });
+
+  if (!dbUser) {
+    const clerkUser = await currentUser();
+    const name = clerkUser?.firstName
+      ? `${clerkUser.firstName} ${clerkUser.lastName || ""}`.trim()
+      : clerkUser?.username || "Gamer";
+
+    dbUser = await prisma.user.create({
+      data: {
+        clerkId,
+        email:
+          clerkUser?.emailAddresses[0]?.emailAddress ||
+          `${clerkId}@placeholder.com`,
+        name,
+        avatarUrl: clerkUser?.imageUrl || null,
+      },
+    });
+  }
+
+  return dbUser;
 }
 
 /**
- * Helper Check: Ελέγχει αν ο χρήστης έχει επιβεβαιώσει τους όρους & ηλικία (18+)
+ * Helper Check: Validates 18+ terms acceptance
  */
 function ensureTermsAccepted(dbUser) {
   if (!dbUser?.acceptedTerms) {
@@ -46,10 +48,6 @@ function ensureTermsAccepted(dbUser) {
   }
 }
 
-/**
- * 🆕 0. Αποδοχή Όρων Χρήσης & Επιβεβαίωση Ηλικίας (18+)
- * (Καλέιται από το ProfileTermsBox.jsx)
- */
 export async function acceptTermsAction() {
   try {
     const dbUser = await getOrCreateDbUser();
@@ -72,9 +70,6 @@ export async function acceptTermsAction() {
   }
 }
 
-/**
- * 1. Δημιουργία Νέου Event / Τραπεζιού
- */
 export async function createEvent(data) {
   try {
     const dbUser = await getOrCreateDbUser();
@@ -83,7 +78,6 @@ export async function createEvent(data) {
       return { success: false, error: "Πρέπει να είστε συνδεδεμένοι." };
     }
 
-    // 🛡️ Gatekeeper Check: Επιβεβαίωση Όρων & Ηλικίας 18+
     if (!dbUser.acceptedTerms) {
       return {
         success: false,
@@ -92,13 +86,12 @@ export async function createEvent(data) {
       };
     }
 
-    // Διαχείριση δεδομένων είτε έρχονται από FormData είτε από JS Object
     const title = (data.title || data.get?.("title"))?.toString().trim();
     const description =
       (data.description || data.get?.("description"))?.toString().trim() ||
       null;
     const city =
-      (data.city || data.get?.("city"))?.toString().trim() || "Αθήνα"; // Required στο Schema
+      (data.city || data.get?.("city"))?.toString().trim() || "Αθήνα";
     const address =
       (data.address || data.get?.("address"))?.toString().trim() || null;
     const rawDateTime = data.dateTime || data.get?.("dateTime");
@@ -112,7 +105,6 @@ export async function createEvent(data) {
       return { success: false, error: "Ο τίτλος είναι υποχρεωτικός." };
     }
 
-    // Δημιουργία εγγραφής στη βάση
     const newEvent = await prisma.event.create({
       data: {
         title,
@@ -121,13 +113,12 @@ export async function createEvent(data) {
         address,
         dateTime,
         maxPlayers,
-        locationType: "STORE", // Enum βάσει schema.prisma
+        locationType: "STORE",
         status: "OPEN",
         hostId: dbUser.id,
       },
     });
 
-    // Ακύρωση του cache για να εμφανιστεί αμέσως στην αρχική σελίδα
     revalidatePath("/");
     return { success: true, eventId: newEvent.id };
   } catch (error) {
@@ -136,19 +127,14 @@ export async function createEvent(data) {
   }
 }
 
-/**
- * 2. Αποστολή μηνύματος στο Tavern Chat
- */
 export async function sendChatMessage(eventId, text) {
   try {
     const dbUser = await getOrCreateDbUser();
 
     if (!dbUser) {
-      console.error(" ❌ Chat Error: Ο χρήστης δεν είναι συνδεδεμένος.");
       return { success: false, error: "Unauthorized" };
     }
 
-    // 🛡️ Gatekeeper Check: Επιβεβαίωση Όρων & Ηλικίας 18+
     if (!dbUser.acceptedTerms) {
       return {
         success: false,
@@ -180,57 +166,58 @@ export async function sendChatMessage(eventId, text) {
   }
 }
 
-/**
- * 3. Συμμετοχή / Αποχώρηση από Event (Toggle Attendance)
- */
 export async function toggleAttendance(eventId) {
-  const dbUser = await getOrCreateDbUser();
+  try {
+    const dbUser = await getOrCreateDbUser();
 
-  if (!dbUser) {
-    throw new Error("Πρέπει να είστε συνδεδεμένοι για να συμμετάσχετε.");
-  }
-
-  // 🛡️ Gatekeeper Check: Επιβεβαίωση Όρων & Ηλικίας 18+
-  ensureTermsAccepted(dbUser);
-
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    include: { participants: true },
-  });
-
-  if (!event) {
-    throw new Error("Το event δεν βρέθηκε.");
-  }
-
-  const existingParticipant = event.participants.find(
-    (p) => p.userId === dbUser.id,
-  );
-
-  if (existingParticipant) {
-    await prisma.participant.delete({
-      where: { id: existingParticipant.id },
-    });
-  } else {
-    if (event.participants.length >= event.maxPlayers) {
-      throw new Error("Το event είναι πλέον πλήρες.");
+    if (!dbUser) {
+      return { success: false, error: "Πρέπει να είστε συνδεδεμένοι." };
     }
 
-    await prisma.participant.create({
-      data: {
-        eventId: event.id,
-        userId: dbUser.id,
-      },
-    });
-  }
+    ensureTermsAccepted(dbUser);
 
-  revalidatePath(`/events/${eventId}`);
-  revalidatePath("/");
-  return { success: true };
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: { participants: true },
+    });
+
+    if (!event) {
+      return { success: false, error: "Το event δεν βρέθηκε." };
+    }
+
+    const existingParticipant = event.participants.find(
+      (p) => p.userId === dbUser.id,
+    );
+
+    if (existingParticipant) {
+      await prisma.participant.delete({
+        where: { id: existingParticipant.id },
+      });
+    } else {
+      const acceptedCount = event.participants.filter(
+        (p) => p.status === "ACCEPTED",
+      ).length;
+
+      // Αν είναι γεμάτο το τραπέζι, μπαίνει στη λίστα αναμονής (WAITLIST), αλλιώς σε PENDING
+      const status = acceptedCount >= event.maxPlayers ? "WAITLIST" : "PENDING";
+
+      await prisma.participant.create({
+        data: {
+          eventId: event.id,
+          userId: dbUser.id,
+          status: status,
+        },
+      });
+    }
+
+    revalidatePath(`/events/${eventId}`);
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }
 
-/**
- * 4. Διαγραφή Event από τον Host
- */
 export async function deleteEvent(eventId) {
   if (!eventId) {
     throw new Error("Δεν παρείχατε έγκυρο Event ID για διαγραφή.");
@@ -262,9 +249,6 @@ export async function deleteEvent(eventId) {
   redirect("/");
 }
 
-/**
- * 5. Ολοκλήρωση Event από τον Host & Απονομή XP
- */
 export async function completeEvent(eventId) {
   try {
     const { userId: clerkId } = await auth();
@@ -292,26 +276,39 @@ export async function completeEvent(eventId) {
       };
     }
 
-    if (event.isCompleted) {
+    if (event.isCompleted || event.status === "COMPLETED") {
       return { success: false, error: "Το event έχει ήδη ολοκληρωθεί." };
     }
 
     const XP_REWARD = 100;
-    const participantUserIds = event.participants.map((p) => p.userId);
+
+    // Παιρνουμε ΜΟΝΟ τους εγκεκριμένους (ACCEPTED) παίκτες εκτός από τον Host
+    const acceptedParticipantUserIds = event.participants
+      .filter((p) => p.status === "ACCEPTED" && p.userId !== event.host.id)
+      .map((p) => p.userId);
 
     await prisma.$transaction([
       prisma.event.update({
         where: { id: eventId },
-        data: { isCompleted: true },
-      }),
-      prisma.user.updateMany({
-        where: {
-          id: { in: participantUserIds },
-        },
         data: {
-          xp: { increment: XP_REWARD },
+          isCompleted: true,
+          status: "COMPLETED",
         },
       }),
+      // Απόδοση XP στους εγκεκριμένους παίκτες
+      ...(acceptedParticipantUserIds.length > 0
+        ? [
+            prisma.user.updateMany({
+              where: {
+                id: { in: acceptedParticipantUserIds },
+              },
+              data: {
+                xp: { increment: XP_REWARD },
+              },
+            }),
+          ]
+        : []),
+      // Απόδοση XP στον Host
       prisma.user.update({
         where: { id: event.host.id },
         data: {

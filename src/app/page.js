@@ -5,7 +5,6 @@ import { SignInButton } from "@clerk/nextjs";
 import EventFilters from "@/components/EventFilters";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function HomePage({ searchParams }) {
   const { userId } = await auth();
@@ -13,85 +12,84 @@ export default async function HomePage({ searchParams }) {
 
   const search = params?.search || "";
   const city = params?.city || "";
-  const gameId = params?.gameId || ""; // ← 1. Λήψη του gameId από τα searchParams
+  const gameId = params?.gameId || "";
   const openOnly = params?.openOnly === "true";
   const statusTab = params?.status || "all";
 
+  const now = new Date();
+  const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+
+  // 1. Δυναμικό χτίσιμο των Prisma Wheres
+  const whereConditions = {
+    AND: [
+      gameId ? { gameId } : {},
+      city ? { city: { equals: city, mode: "insensitive" } } : {},
+      search
+        ? {
+            OR: [
+              { title: { contains: search, mode: "insensitive" } },
+              { description: { contains: search, mode: "insensitive" } },
+              { gameTitle: { contains: search, mode: "insensitive" } }, // Έλεγχος στο πεδίο gameTitle του Event
+              { game: { title: { contains: search, mode: "insensitive" } } }, // 👈 Διορθώθηκε από name σε title
+            ],
+          }
+        : {},
+    ],
+  };
+
+  // 2. Φιλτράρισμα Status απευθείας στη βάση
+  if (statusTab === "open") {
+    whereConditions.AND.push({
+      isCompleted: false,
+      dateTime: { gt: now },
+    });
+  } else if (statusTab === "live") {
+    whereConditions.AND.push({
+      isCompleted: false,
+      dateTime: { lte: now, gte: fourHoursAgo },
+    });
+  } else if (statusTab === "completed") {
+    whereConditions.AND.push({
+      OR: [{ isCompleted: true }, { dateTime: { lt: fourHoursAgo } }],
+    });
+  }
+
   let events = [];
   let citiesList = [];
-  const now = new Date();
 
   try {
-    const rawEvents = await prisma.event.findMany({
-      where: {
-        AND: [
-          // Φιλτράρισμα βάσει gameId αν υπάρχει
-          gameId ? { gameId: gameId } : {},
+    const [rawEvents, distinctCities] = await Promise.all([
+      prisma.event.findMany({
+        where: whereConditions,
+        orderBy: { dateTime: "asc" },
+        include: {
+          host: true,
+          game: true,
+          _count: { select: { participants: true } },
+        },
+      }),
+      prisma.event.groupBy({
+        by: ["city"],
+        where: { city: { not: "" } },
+      }),
+    ]);
 
-          // Αναζήτηση σε Title, Description & Ονομασία Παιχνιδιού
-          search
-            ? {
-                OR: [
-                  { title: { contains: search, mode: "insensitive" } },
-                  { description: { contains: search, mode: "insensitive" } },
-                  { game: { name: { contains: search, mode: "insensitive" } } }, // ← Ψάχνει και στο Game Model
-                ],
-              }
-            : {},
-
-          // Φιλτράρισμα Πόλης
-          city ? { city: { equals: city, mode: "insensitive" } } : {},
-        ],
-      },
-      orderBy: { dateTime: "asc" },
-      include: {
-        host: true,
-        game: true,
-        _count: { select: { participants: true } },
-      },
-    });
-
+    // 3. Post-filter για το openOnly (maxPlayers vs participants)
     events = rawEvents.filter((event) => {
-      const eventDate = new Date(event.dateTime);
-
-      const isLive =
-        !event.isCompleted &&
-        eventDate <= now &&
-        now.getTime() - eventDate.getTime() <= 4 * 60 * 60 * 1000;
-
-      const isCompleted = Boolean(event.isCompleted);
-      const isScheduled = !isCompleted && !isLive;
-
-      if (statusTab === "open" && !isScheduled) return false;
-      if (statusTab === "live" && !isLive) return false;
-      if (statusTab === "completed" && !isCompleted) return false;
-
-      if (
-        openOnly &&
-        (isCompleted || event._count.participants >= event.maxPlayers)
-      ) {
-        return false;
+      if (openOnly) {
+        const isFull = event._count.participants >= event.maxPlayers;
+        if (event.isCompleted || isFull) return false;
       }
-
       return true;
     });
 
-    const allCities = await prisma.event.findMany({
-      where: { city: { not: "" } },
-      select: { city: true },
-      distinct: ["city"],
-    });
-
-    citiesList = allCities
-      .map((e) => e.city)
-      .filter((c) => typeof c === "string" && c.trim() !== "");
+    citiesList = distinctCities
+      .map((c) => c.city)
+      .filter((c) => Boolean(c && c.trim()));
   } catch (error) {
     console.error("Error loading HomePage events:", error);
-    events = [];
-    citiesList = [];
   }
 
-  // Helper function για διατήρηση όλων των URL params στα Tabs
   const createTabQuery = (status) => {
     const queryParams = new URLSearchParams();
     if (status) queryParams.set("status", status);
@@ -167,50 +165,30 @@ export default async function HomePage({ searchParams }) {
 
         {/* Tab Filters */}
         <div className="flex flex-wrap gap-2 mb-6">
-          <Link
-            href={createTabQuery("all")}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition ${
-              statusTab === "all"
-                ? "bg-purple-600 text-white border border-purple-400 shadow-lg shadow-purple-900/40"
-                : "bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-white"
-            }`}
-          >
-            🎲 Όλα
-          </Link>
-
-          <Link
-            href={createTabQuery("open")}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition ${
-              statusTab === "open"
-                ? "bg-indigo-600 text-white border border-indigo-400 shadow-lg shadow-indigo-900/40"
-                : "bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-white"
-            }`}
-          >
-            📅 Προγραμματισμένα
-          </Link>
-
-          <Link
-            href={createTabQuery("live")}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 ${
-              statusTab === "live"
-                ? "bg-emerald-600 text-white border border-emerald-400 shadow-lg shadow-emerald-900/40"
-                : "bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-white"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            🟢 Live / Σε Εξέλιξη
-          </Link>
-
-          <Link
-            href={createTabQuery("completed")}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition ${
-              statusTab === "completed"
-                ? "bg-slate-800 text-amber-300 border border-amber-500/30 shadow-lg"
-                : "bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-white"
-            }`}
-          >
-            🏆 Ολοκληρωμένα
-          </Link>
+          {[
+            { id: "all", label: "🎲 Όλα", color: "purple" },
+            { id: "open", label: "📅 Προγραμματισμένα", color: "indigo" },
+            { id: "live", label: "🟢 Live / Σε Εξέλιξη", color: "emerald" },
+            { id: "completed", label: "🏆 Ολοκληρωμένα", color: "amber" },
+          ].map((tab) => {
+            const isActive = statusTab === tab.id;
+            return (
+              <Link
+                key={tab.id}
+                href={createTabQuery(tab.id)}
+                className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 ${
+                  isActive
+                    ? `bg-${tab.color}-600 text-white border border-${tab.color}-400 shadow-lg`
+                    : "bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-white"
+                }`}
+              >
+                {tab.id === "live" && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                )}
+                {tab.label}
+              </Link>
+            );
+          })}
         </div>
 
         <EventFilters cities={citiesList} />
@@ -236,19 +214,17 @@ export default async function HomePage({ searchParams }) {
               const formattedDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} - ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
               const isFull = event._count.participants >= event.maxPlayers;
-              const isCompleted = Boolean(event.isCompleted);
+              const isCompleted =
+                Boolean(event.isCompleted) ||
+                now.getTime() - d.getTime() > 4 * 60 * 60 * 1000;
               const isLive =
-                !isCompleted &&
+                !event.isCompleted &&
                 d <= now &&
                 now.getTime() - d.getTime() <= 4 * 60 * 60 * 1000;
 
-              const gameImageUrl =
-                event.imageUrl ||
-                event.gameImage ||
-                event.thumbnail ||
-                event.game?.image ||
-                event.game?.thumbnail ||
-                event.game?.imageUrl;
+              // Ανάκτηση εικόνας είτε από το Event είτε από το Relation Game
+              const gameImageUrl = event.imageUrl || event.game?.imageUrl;
+              const displayGameTitle = event.gameTitle || event.game?.title;
 
               return (
                 <div
@@ -272,11 +248,11 @@ export default async function HomePage({ searchParams }) {
                         className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition duration-500"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/30 to-transparent pointer-events-none" />
-                      {/* Προαιρετικό badge ονόματος παιχνιδιού πάνω στην εικόνα */}
+
                       <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
-                        {(event.gameTitle || event.game?.name) && (
+                        {displayGameTitle && (
                           <span className="bg-slate-950/80 text-cyan-300 text-xs font-semibold px-2.5 py-1 rounded-md border border-cyan-500/30 backdrop-blur-sm">
-                            🎲 {event.gameTitle || event.game?.name}
+                            🎲 {displayGameTitle}
                           </span>
                         )}
                         {event.minPlayers && (

@@ -3,7 +3,11 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { deleteEvent, sendChatMessage } from "@/app/events/create/actions";
+import {
+  completeEvent,
+  deleteEvent,
+  sendChatMessage,
+} from "@/app/events/create/actions";
 import JoinButton from "./JoinButton";
 import HostRequestManager from "@/components/HostRequestManager";
 import DeleteEventButton from "@/components/DeleteEventButton";
@@ -11,14 +15,23 @@ import EventChat from "@/components/EventChat";
 import UserStatusPill from "@/components/UserStatusPill";
 import ShareEventButton from "@/components/ShareEventButton";
 import { getUserRank } from "@/lib/badges";
+import CompleteEventButton from "@/components/CompleteEventButton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default async function EventDetailPage({ params }) {
   const { id } = await params;
   const { userId: clerkId } = await auth();
 
+  // Παράλληλη ανάκτηση Event και Συνδεδεμένου Χρήστη
   const [event, currentUser] = await Promise.all([
     prisma.event.findUnique({
-      where: { id: id },
+      where: { id },
       include: {
         host: true,
         game: true,
@@ -36,8 +49,9 @@ export default async function EventDetailPage({ params }) {
 
   if (!event) notFound();
 
-  const isHost = clerkId === event.host?.clerkId;
+  const isHost = Boolean(clerkId && clerkId === event.host?.clerkId);
 
+  // Φιλτράρισμα Συμμετεχόντων ανά Status
   const acceptedParticipants = event.participants.filter(
     (p) => p.status === "ACCEPTED",
   );
@@ -48,19 +62,24 @@ export default async function EventDetailPage({ params }) {
     (p) => p.status === "WAITLIST",
   );
 
+  // Κατάσταση τρέχοντος χρήστη
   const currentUserParticipant = event.participants.find(
-    (p) => p.userId === currentUser?.id || p.user?.clerkId === clerkId,
+    (p) =>
+      (currentUser?.id && p.userId === currentUser.id) ||
+      (clerkId && p.user?.clerkId === clerkId),
   );
   const userStatus = currentUserParticipant?.status || null;
 
   const isAccepted = userStatus === "ACCEPTED";
-  const isFull = acceptedParticipants.length >= event.maxPlayers;
+  const maxPlayers = event.maxPlayers || 1;
+  const isFull = acceptedParticipants.length >= maxPlayers;
   const canChat = isHost || isAccepted;
 
+  // Υπολογισμός Live / Finished Status
   const now = new Date();
   const eventDate = event.dateTime ? new Date(event.dateTime) : null;
   const eventEndDate = eventDate
-    ? new Date(eventDate.getTime() + 3 * 60 * 60 * 1000)
+    ? new Date(eventDate.getTime() + 3 * 60 * 60 * 1000) // Προεπιλεγμένη διάρκεια 3 ώρες
     : null;
 
   const isFinished = eventEndDate ? now > eventEndDate : false;
@@ -81,10 +100,12 @@ export default async function EventDetailPage({ params }) {
 
   const hostRank = getUserRank(event.host?.xp || 0);
   const gameImageUrl = event.imageUrl || event.game?.imageUrl || null;
+  const gameTitle = event.gameTitle || event.game?.title || null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-12 px-4">
       <div className="max-w-4xl mx-auto space-y-8">
+        {/* Navigation Link */}
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm font-mono text-purple-400 hover:text-purple-300 transition group"
@@ -93,6 +114,7 @@ export default async function EventDetailPage({ params }) {
           σε όλα τα Events
         </Link>
 
+        {/* Main Event Card */}
         <div
           className={`relative bg-slate-900/90 border rounded-3xl shadow-2xl backdrop-blur-md overflow-hidden transition ${
             isFinished ? "border-slate-800/60 opacity-85" : "border-slate-800"
@@ -103,20 +125,21 @@ export default async function EventDetailPage({ params }) {
             <div className="relative w-full h-56 sm:h-72 bg-slate-950 overflow-hidden border-b border-slate-800">
               <Image
                 src={gameImageUrl}
-                alt={event.title}
+                alt={event.title || "Event banner"}
                 fill
                 unoptimized
                 referrerPolicy="no-referrer"
                 className="object-cover opacity-80 hover:opacity-100 transition duration-500"
                 priority
               />
+
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
 
-              {/* BGG Στοιχεία πάνω στην εικόνα */}
+              {/* BGG / Game Badges πάνω στην εικόνα */}
               <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-                {(event.gameTitle || event.game?.title) && (
+                {gameTitle && (
                   <span className="bg-slate-950/80 text-cyan-300 text-xs font-semibold px-2.5 py-1 rounded-md border border-cyan-500/30 backdrop-blur-sm">
-                    🎲 {event.gameTitle || event.game?.title}
+                    🎲 {gameTitle}
                     {event.yearPublished && (
                       <span className="text-slate-500 ml-1">
                         ({event.yearPublished})
@@ -146,7 +169,7 @@ export default async function EventDetailPage({ params }) {
           <div className="p-6 md:p-10 relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[90px] pointer-events-none rounded-full" />
 
-            {/* Τίτλος & Status */}
+            {/* Τίτλος & Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-6 border-b border-slate-800">
               <div>
                 <div className="flex items-center gap-2 mb-2">
@@ -175,7 +198,8 @@ export default async function EventDetailPage({ params }) {
                 </h1>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {/* Share & Host Dropdown Actions */}
+              <div className="flex items-center gap-2 shrink-0">
                 <ShareEventButton
                   eventId={event.id}
                   title={event.title}
@@ -186,19 +210,71 @@ export default async function EventDetailPage({ params }) {
                       : "Online"
                   }
                 />
+
                 {isHost && (
-                  <>
-                    <Link
-                      href={`/events/${event.id}/edit`}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-xl font-mono text-xs font-bold transition flex items-center gap-1.5"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/50 transition duration-150 focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer">
+                      <span className="sr-only">Επιλογές διαχείρισης</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="1" />
+                        <circle cx="12" cy="5" r="1" />
+                        <circle cx="12" cy="19" r="1" />
+                      </svg>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-48 bg-slate-900 border border-slate-800 text-slate-200 rounded-xl p-1.5 shadow-xl backdrop-blur-md z-50"
                     >
-                      <span>✏️</span> Επεξεργασία
-                    </Link>
-                    <DeleteEventButton
-                      eventId={event.id}
-                      deleteAction={deleteEvent}
-                    />
-                  </>
+                      {!isFinished && (
+                        <>
+                          <DropdownMenuItem
+                            asChild
+                            className="focus:bg-purple-950/50 focus:text-purple-200 rounded-lg cursor-pointer my-0.5"
+                          >
+                            <CompleteEventButton
+                              eventId={event.id}
+                              completeAction={completeEvent}
+                            />
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-slate-800/80 my-1" />
+                        </>
+                      )}
+
+                      <DropdownMenuItem
+                        asChild
+                        className="focus:bg-slate-800 focus:text-white rounded-lg cursor-pointer my-0.5"
+                      >
+                        <Link
+                          href={`/events/${event.id}/edit`}
+                          className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-mono font-medium"
+                        >
+                          <span>✏️</span> Επεξεργασία
+                        </Link>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator className="bg-slate-800/80 my-1" />
+
+                      <DropdownMenuItem
+                        asChild
+                        className="focus:bg-red-950/40 focus:text-red-300 rounded-lg cursor-pointer my-0.5"
+                      >
+                        <DeleteEventButton
+                          eventId={event.id}
+                          deleteAction={deleteEvent}
+                        />
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </div>
@@ -209,7 +285,7 @@ export default async function EventDetailPage({ params }) {
                 {event.host?.avatarUrl ? (
                   <Image
                     src={event.host.avatarUrl}
-                    alt={event.host.name || "Host"}
+                    alt={event.host.name || "Host Avatar"}
                     fill
                     className="object-cover"
                   />
@@ -252,7 +328,7 @@ export default async function EventDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Λεπτομέρειες Event */}
+            {/* Λεπτομέρειες Event & Game Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 bg-slate-950/80 border border-slate-800 p-5 rounded-2xl">
               <div>
                 <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-1">
@@ -304,14 +380,13 @@ export default async function EventDetailPage({ params }) {
                 </p>
               </div>
 
-              {/* ← ΝΕΑ BGG ΣΤΟΙΧΕΙΑ */}
-              {event.gameTitle && (
+              {gameTitle && (
                 <div>
                   <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-1">
                     🎲 Παιχνίδι
                   </span>
                   <p className="text-slate-200 font-semibold text-sm">
-                    {event.gameTitle}
+                    {gameTitle}
                     {event.yearPublished && (
                       <span className="text-slate-500 font-normal ml-2">
                         ({event.yearPublished})
@@ -398,7 +473,7 @@ export default async function EventDetailPage({ params }) {
           </div>
         </div>
 
-        {/* Host Management */}
+        {/* Host Request Manager (Μόνο αν ο χρήστης είναι Host) */}
         {isHost && pendingRequests.length > 0 && (
           <HostRequestManager
             eventId={event.id}
@@ -428,6 +503,7 @@ export default async function EventDetailPage({ params }) {
                 const name = attendee.user?.name || "Χρήστης";
                 const avatar = attendee.user?.avatarUrl;
                 const userRank = getUserRank(attendee.user?.xp || 0);
+
                 return (
                   <div
                     key={attendee.id}
@@ -497,7 +573,7 @@ export default async function EventDetailPage({ params }) {
           </div>
         )}
 
-        {/* Chat */}
+        {/* Event Chat */}
         {canChat ? (
           <EventChat
             eventId={event.id}

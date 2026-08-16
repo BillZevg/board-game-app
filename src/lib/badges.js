@@ -26,7 +26,7 @@ export const RANKS = [
   {
     minXp: 300,
     title: "Shieldbearer of the Realm",
-    icon: "/badges/shield.png", // 👈 Η νέα σου ασπίδα!
+    icon: "/badges/shield.png",
     rarity: "Uncommon",
     color:
       "text-cyan-300 border-cyan-500/80 bg-cyan-950/60 shadow-[0_0_12px_rgba(6,182,212,0.3)] font-semibold",
@@ -81,7 +81,7 @@ export const RANKS = [
 ];
 
 /**
- * Επιστρέφει το Rank & Badge του χρήστη βάσει των XP του.
+ * Επιστρέφει το τρέχον Rank του χρήστη βάσει των XP του.
  */
 export function getUserRank(xp = 0) {
   let currentRank = RANKS[0];
@@ -95,4 +95,51 @@ export function getUserRank(xp = 0) {
   }
 
   return currentRank;
+}
+
+/**
+ * ⚡ ΝΕΟ: Επιστρέφει πληροφορίες προόδου για το επόμενο Rank (π.χ. για Progress Bar)
+ */
+export function getRankProgress(xp = 0) {
+  const currentRank = getUserRank(xp);
+  const currentIndex = RANKS.findIndex((r) => r.title === currentRank.title);
+  const nextRank = RANKS[currentIndex + 1] || null;
+
+  if (!nextRank) {
+    return {
+      currentRank,
+      nextRank: null,
+      progressPercentage: 100,
+      xpNeeded: 0,
+    };
+  }
+
+  const currentLevelMinXp = currentRank.minXp;
+  const nextLevelMinXp = nextRank.minXp;
+
+  const xpInCurrentLevel = xp - currentLevelMinXp;
+  const xpRequiredForNextLevel = nextLevelMinXp - currentLevelMinXp;
+
+  const progressPercentage = Math.min(
+    Math.max(Math.round((xpInCurrentLevel / xpRequiredForNextLevel) * 100), 0),
+    100,
+  );
+
+  return {
+    currentRank,
+    nextRank,
+    progressPercentage,
+    xpNeeded: nextLevelMinXp - xp,
+  };
+}
+
+/**
+ * ⚡ ΝΕΟ: Επιστρέφει όλα τα badges σημειώνοντας ποια έχει ξεκλειδώσει ο χρήστης
+ * (Χρήσιμο για το Profile / Trophy Cabinet)
+ */
+export function getAllBadgesWithStatus(xp = 0) {
+  return RANKS.map((rank) => ({
+    ...rank,
+    isUnlocked: xp >= rank.minXp,
+  }));
 }
