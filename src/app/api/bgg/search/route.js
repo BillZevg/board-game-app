@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 import Papa from "papaparse";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("query");
