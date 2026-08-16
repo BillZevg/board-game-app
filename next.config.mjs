@@ -12,6 +12,21 @@ const nextConfig = {
         protocol: "https",
         hostname: "images.clerk.dev",
       },
+
+      {
+        protocol: "https",
+        hostname: "cf.geekdo-images.com",
+      },
+
+      {
+        protocol: "https",
+        hostname: "*.geekdo-images.com",
+      },
+
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
     ],
   },
 };

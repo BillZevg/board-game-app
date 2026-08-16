@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import ProfileTermsBox from "@/components/ProfileTermsBox";
+import { getReliabilityScore } from "@/lib/reliability"; // 👈 Εισαγωγή της συνάρτησης
 
 export default async function ProfilePage() {
   const { userId: clerkId } = await auth();
@@ -14,10 +15,15 @@ export default async function ProfilePage() {
 
   const clerkUser = await currentUser();
 
-  // Φέρνουμε τον χρήστη από τη βάση μαζί με τα Hosted & Joined events
+  // Φέρνουμε τον χρήστη από τη βάση μαζί με τα νέα πεδία reliability & events
   const dbUser = await prisma.user.findUnique({
     where: { clerkId },
-    include: {
+    select: {
+      id: true,
+      acceptedTerms: true,
+      attendedCount: true, // 👈 Νέο πεδίο
+      noShowCount: true, // 👈 Νέο πεδίο
+      lateCancelCount: true, // 👈 Νέο πεδίο
       hostedEvents: {
         orderBy: { dateTime: "asc" },
         include: {
@@ -38,11 +44,13 @@ export default async function ProfilePage() {
   });
 
   const hostedEvents = dbUser?.hostedEvents || [];
-  // Φιλτράρουμε τις συμμετοχές ώστε να μην εμφανίζονται διπλά τα events που διοργανώνει ο ίδιος
   const joinedEvents =
     dbUser?.participations
       ?.map((p) => p.event)
       .filter((e) => e.host.clerkId !== clerkId) || [];
+
+  // 🛡️ Υπολογισμός Reliability Score
+  const reliability = getReliabilityScore(dbUser);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-12 px-4">
@@ -114,6 +122,23 @@ export default async function ProfilePage() {
                     </div>
                     <div className="text-sm font-bold text-cyan-300">
                       {joinedEvents.length} Sessions
+                    </div>
+                  </div>
+                </div>
+
+                {/* 🌱 RELIABILITY SCORE BADGE */}
+                <div
+                  className={`border px-4 py-2 rounded-xl flex items-center gap-2 transition ${reliability.color}`}
+                >
+                  <span className="text-lg">🌱</span>
+                  <div>
+                    <div className="text-[10px] font-mono opacity-80 uppercase">
+                      Reliability
+                    </div>
+                    <div className="text-sm font-bold">
+                      {reliability.isNew
+                        ? reliability.label
+                        : `${reliability.score}%`}
                     </div>
                   </div>
                 </div>

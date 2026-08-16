@@ -1,6 +1,6 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
-import { prisma } from "@/lib/prisma"; // Χρήση του absolute import alias
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req) {
   // 1. Λήψη του CLERK_WEBHOOK_SECRET απο το .env
@@ -22,9 +22,8 @@ export async function POST(req) {
     return new Response("Σφάλμα: Λείπουν τα Svix headers", { status: 400 });
   }
 
-  // 3. Λήψη του raw body
-  const payload = await req.json();
-  const body = JSON.stringify(payload);
+  // 3. Λήψη του RAW body ως text (ΟΧΙ req.json())
+  const body = await req.text();
 
   // 4. Επαλήθευση της υπογραφής με το Svix
   const wh = new Webhook(WEBHOOK_SECRET);
@@ -41,21 +40,19 @@ export async function POST(req) {
     return new Response("Σφάλμα: Μη έγκυρη υπογραφή", { status: 400 });
   }
 
-  // 5. Διαχείριση των events
+  // 5. Parsing του επαληθευμένου payload
   const eventType = evt.type;
 
   if (eventType === "user.created" || eventType === "user.updated") {
     const { id, email_addresses, first_name, last_name, image_url, username } =
       evt.data;
 
-    // ΔΙΟΡΘΩΣΗ: email_address (ενικός)
     const primaryEmail = email_addresses?.[0]?.email_address || "";
     const fullName =
       [first_name, last_name].filter(Boolean).join(" ") ||
       username ||
       "Adventurer";
 
-    // Χρήση upsert ώστε να καλύπτει και δημιουργία και ενημέρωση χωρίς crash
     await prisma.user.upsert({
       where: { clerkId: id },
       update: {
@@ -77,7 +74,6 @@ export async function POST(req) {
   if (eventType === "user.deleted") {
     const { id } = evt.data;
     if (id) {
-      // Χρήση deleteMany για να μην πετάξει error αν ο χρήστης έχει ήδη διαγραφεί
       await prisma.user.deleteMany({
         where: { clerkId: id },
       });

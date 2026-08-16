@@ -23,20 +23,33 @@ enum ParticipantStatus {
   PENDING
   ACCEPTED
   REJECTED
+  WAITLIST
+  ATTENDED  // 👈 Νέο status: Επιβεβαιωμένη παρουσία στο event
+  NO_SHOW   // 👈 Νέο status: Δεν εμφανίστηκε στο event
 }
 
 model User {
-  id             String   @id @default(cuid())
-  clerkId        String   @unique
-  email          String   @unique
+  id             String        @id @default(cuid())
+  clerkId        String        @unique
+  email          String        @unique
   name           String?
   avatarUrl      String?
   city           String?
   bio            String?
-  xp             Int      @default(0)
-  acceptedTerms  Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  xp             Int           @default(0)
+  acceptedTerms  Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // 👈 Νέα Πεδία για το BGG
+  bggId        String?
+  imageUrl     String?
+  playingTime  Int?
+
+  // ⚡ ΝΕΑ ΠΕΔΙΑ ΓΙΑ RELIABILITY SCORE & NO-SHOW PROTECTION
+  attendedCount   Int          @default(0) // Συνεδρίες που παρευρέθηκε επιτυχώς
+  noShowCount     Int          @default(0) // Συνεδρίες που δεν εμφανίστηκε
+  lateCancelCount Int          @default(0) // Ακυρώσεις τελευταίας στιγμής (< 3 ώρες)
 
   hostedEvents   Event[]       @relation("HostedEvents")
   participations Participant[]
@@ -70,9 +83,18 @@ model Event {
   address      String?
   maxPlayers   Int
   status       EventStatus  @default(OPEN)
+  imageUrl     String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   isCompleted  Boolean      @default(false)
+
+
+   // ← ΝΕΑ BGG FIELDS
+  minPlayers    Int?
+  playingTime   Int?
+  minAge        Int?
+  yearPublished Int?
+  gameTitle     String?
 
   hostId String
   host   User   @relation("HostedEvents", fields: [hostId], references: [id], onDelete: Cascade)

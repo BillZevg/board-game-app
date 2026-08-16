@@ -18,7 +18,7 @@ export default function DeleteEventButton({ eventId, deleteAction }) {
     <button
       onClick={handleDelete}
       disabled={isPending}
-      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl font-mono text-xs font-bold transition disabled:opacity-50"
+      className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl font-mono text-xs font-bold transition disabled:opacity-50 cursor-pointer"
     >
       {isPending ? "Διαγραφή..." : "🗑️ Διαγραφή"}
     </button>

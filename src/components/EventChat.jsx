@@ -179,10 +179,11 @@ export default function EventChat({
                       title={`${userRank.rarity} Rank • ${msg.user?.xp || 0} XP`}
                     >
                       <div className="relative w-3.5 h-3.5 shrink-0 justify-center">
-                        <img
+                        <Image
                           src={userRank.icon}
                           alt={userRank.title}
-                          className="w-3.5 h-3.5 object-contain filter drop-shadow shrink-0"
+                          fill
+                          className="object-cover"
                         />
                       </div>
                       <span className="font-sans font-semibold">
