@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserButton, useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import NotificationBell from "@/components/NotificationBell"; // 🔔 Import NotificationBell
 
 export default function Header() {
   const { isSignedIn, isLoaded } = useUser();
@@ -121,6 +122,9 @@ export default function Header() {
               <div className="h-9 w-24 bg-purple-950/50 animate-pulse rounded-xl border border-purple-800/40" />
             ) : isSignedIn ? (
               <div className="flex items-center gap-4 pl-3 border-l border-purple-900/60">
+                {/* 🔔 NotificationBell για Desktop */}
+                <NotificationBell />
+
                 <Link
                   href="/profile"
                   className="text-xs font-mono font-semibold text-purple-200/70 hover:text-pink-300 transition"
@@ -153,13 +157,18 @@ export default function Header() {
           {/* MOBILE MENU TOGGLE BUTTON */}
           <div className="flex md:hidden items-center gap-3">
             {isSignedIn && (
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-8 h-8 border border-pink-500/40",
-                  },
-                }}
-              />
+              <>
+                {/* 🔔 NotificationBell για Mobile */}
+                <NotificationBell />
+
+                <UserButton
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-8 h-8 border border-pink-500/40",
+                    },
+                  }}
+                />
+              </>
             )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

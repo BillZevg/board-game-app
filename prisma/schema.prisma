@@ -8,6 +8,10 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// --------------------------------------
+// ENUMS
+// --------------------------------------
+
 enum Role {
   USER
   ADMIN
@@ -29,8 +33,8 @@ enum ParticipantStatus {
   ACCEPTED
   REJECTED
   WAITLIST
-  ATTENDED  // 👈 Νέο status: Επιβεβαιωμένη παρουσία στο event
-  NO_SHOW   // 👈 Νέο status: Δεν εμφανίστηκε στο event
+  ATTENDED  // Επιβεβαιωμένη παρουσία στο event
+  NO_SHOW   // Δεν εμφανίστηκε στο event
 }
 
 enum ReportStatus {
@@ -39,44 +43,48 @@ enum ReportStatus {
   DISMISSED
 }
 
-model Report {
-  id         String       @id @default(cuid())
-  reporterId String
-  targetId   String
-  targetType String       // π.χ. "EVENT", "USER", "MESSAGE"
-  reason     String
-  status     ReportStatus @default(PENDING)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+enum NotificationType {
+  REQUEST_ACCEPTED
+  REQUEST_REJECTED
+  CHAT_MESSAGE
+  EVENT_CANCELLED
+  EVENT_UPDATED
+  SESSION_REMINDER
 }
 
+// --------------------------------------
+// MODELS
+// --------------------------------------
+
 model User {
-  id             String        @id @default(cuid())
-  clerkId        String        @unique
-  email          String        @unique
-  name           String?
-  avatarUrl      String?
-  city           String?
-  bio            String?
-  xp             Int           @default(0)
-  acceptedTerms  Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  role           Role          @default(USER)
+  id              String        @id @default(cuid())
+  clerkId         String        @unique
+  email           String        @unique
+  name            String?
+  avatarUrl       String?
+  city            String?
+  bio             String?
+  xp              Int           @default(0)
+  acceptedTerms   Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  role            Role          @default(USER)
 
-  // 👈 Νέα Πεδία για το BGG
-  bggId        String?
-  imageUrl     String?
-  playingTime  Int?
+  // BGG Fields
+  bggId           String?
+  imageUrl        String?
+  playingTime     Int?
 
-  // ⚡ ΝΕΑ ΠΕΔΙΑ ΓΙΑ RELIABILITY SCORE & NO-SHOW PROTECTION
-  attendedCount   Int          @default(0) // Συνεδρίες που παρευρέθηκε επιτυχώς
-  noShowCount     Int          @default(0) // Συνεδρίες που δεν εμφανίστηκε
-  lateCancelCount Int          @default(0) // Ακυρώσεις τελευταίας στιγμής (< 3 ώρες)
+  // Reliability Score & No-Show Protection
+  attendedCount   Int           @default(0)
+  noShowCount     Int           @default(0)
+  lateCancelCount Int           @default(0)
 
-  hostedEvents   Event[]       @relation("HostedEvents")
-  participations Participant[]
-  messages       ChatMessage[]
+  // Relations
+  hostedEvents    Event[]       @relation("HostedEvents")
+  participations  Participant[]
+  messages        ChatMessage[]
+  notifications   Notification[] // 👈 Προστέθηκε η αμφίδρομη σχέση
 
   @@map("users")
 }
@@ -91,7 +99,7 @@ model Game {
   maxPlayers  Int
   createdAt   DateTime @default(now())
 
-  events Event[]
+  events      Event[]
 
   @@map("games")
 }
@@ -111,19 +119,19 @@ model Event {
   updatedAt    DateTime     @updatedAt
   isCompleted  Boolean      @default(false)
 
-
-   // ← ΝΕΑ BGG FIELDS
+  // BGG Fields
   minPlayers    Int?
   playingTime   Int?
   minAge        Int?
   yearPublished Int?
   gameTitle     String?
 
-  hostId String
-  host   User   @relation("HostedEvents", fields: [hostId], references: [id], onDelete: Cascade)
+  // Relations
+  hostId       String
+  host         User         @relation("HostedEvents", fields: [hostId], references: [id], onDelete: Cascade)
 
-  gameId String?
-  game   Game?   @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  gameId       String?
+  game         Game?        @relation(fields: [gameId], references: [id], onDelete: SetNull)
 
   participants Participant[]
   messages     ChatMessage[]
@@ -138,11 +146,11 @@ model Participant {
   status    ParticipantStatus @default(PENDING)
   createdAt DateTime          @default(now())
 
-  eventId String
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
   @@map("participants")
@@ -153,12 +161,40 @@ model ChatMessage {
   content   String   @db.Text
   createdAt DateTime @default(now())
 
-  eventId String
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
   @@map("chat_messages")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  type      NotificationType
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  targetId   String
+  targetType String       // π.χ. "EVENT", "USER", "MESSAGE"
+  reason     String
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@map("reports")
 }

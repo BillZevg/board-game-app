@@ -9,7 +9,7 @@ import { chatMessageSchema, eventSchema } from "@/lib/validations/schemas";
 import { chatRateLimit, generalRateLimit } from "@/lib/ratelimit";
 
 /**
- * Helper: Finds or creates user in DB.
+ * Helper: Βρίσκει ή δημιουργεί τον χρήστη στη Βάση Δεδομένων.
  */
 async function getOrCreateDbUser() {
   const { userId: clerkId } = await auth();
@@ -25,23 +25,28 @@ async function getOrCreateDbUser() {
       ? `${clerkUser.firstName} ${clerkUser.lastName || ""}`.trim()
       : clerkUser?.username || "Gamer";
 
-    dbUser = await prisma.user.create({
-      data: {
-        clerkId,
-        email:
-          clerkUser?.emailAddresses[0]?.emailAddress ||
-          `${clerkId}@placeholder.com`,
-        name,
-        avatarUrl: clerkUser?.imageUrl || null,
-      },
-    });
+    try {
+      dbUser = await prisma.user.create({
+        data: {
+          clerkId,
+          email:
+            clerkUser?.emailAddresses[0]?.emailAddress ||
+            `${clerkId}@placeholder.com`,
+          name,
+          avatarUrl: clerkUser?.imageUrl || null,
+        },
+      });
+    } catch (e) {
+      // Αν δημιουργήθηκε ταυτόχρονα από άλλο request, το ξαναπαίρνουμε
+      dbUser = await prisma.user.findUnique({ where: { clerkId } });
+    }
   }
 
   return dbUser;
 }
 
 /**
- * Helper Check: Validates 18+ terms acceptance
+ * Helper: Επαληθεύει την αποδοχή των όρων 18+
  */
 function ensureTermsAccepted(dbUser) {
   if (!dbUser?.acceptedTerms) {
@@ -208,9 +213,9 @@ export async function sendChatMessage(eventId, text) {
     // 📡 Εκπομπή του νέου μηνύματος σε πραγματικό χρόνο μέσω Pusher
     try {
       await pusherServer.trigger(
-        `event-${cleanData.eventId}`, // Channel Name
-        "new-message", // Event Name
-        newMessage, // Data Payload
+        `event-${cleanData.eventId}`,
+        "new-message",
+        newMessage,
       );
     } catch (pusherError) {
       console.error("❌ Σφάλμα Pusher trigger:", pusherError);
@@ -256,7 +261,6 @@ export async function toggleAttendance(eventId) {
         (p) => p.status === "ACCEPTED",
       ).length;
 
-      // Αν είναι γεμάτο το τραπέζι, μπαίνει στη λίστα αναμονής (WAITLIST), αλλιώς σε PENDING
       const status = acceptedCount >= event.maxPlayers ? "WAITLIST" : "PENDING";
 
       await prisma.participant.create({
@@ -340,7 +344,6 @@ export async function completeEvent(eventId) {
 
     const XP_REWARD = 100;
 
-    // Παίρνουμε ΜΟΝΟ τους εγκεκριμένους (ACCEPTED) παίκτες εκτός από τον Host
     const acceptedParticipantUserIds = event.participants
       .filter((p) => p.status === "ACCEPTED" && p.userId !== event.host.id)
       .map((p) => p.userId);
@@ -353,7 +356,6 @@ export async function completeEvent(eventId) {
           status: "COMPLETED",
         },
       }),
-      // Απόδοση XP στους εγκεκριμένους παίκτες
       ...(acceptedParticipantUserIds.length > 0
         ? [
             prisma.user.updateMany({
@@ -366,7 +368,6 @@ export async function completeEvent(eventId) {
             }),
           ]
         : []),
-      // Απόδοση XP στον Host
       prisma.user.update({
         where: { id: event.host.id },
         data: {

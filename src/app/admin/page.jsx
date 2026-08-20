@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { deleteEventAdminAction, resolveReportAction } from "./actions";
+import {
+  deleteEventAdminAction,
+  cancelEventAction,
+  resolveReportAction,
+  updateUserXPAction,
+} from "@/lib/admin"; // 👈 Ενημερωμένο import από το lib/admin
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,8 +15,6 @@ export default async function AdminDashboardPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  // 🔹 Χρησιμοποιούμε update ΑΝ θέλεις να γίνεις ADMIN αυτόματα
-  // Διαφορετικά άλλαξέ το σε prisma.user.findUnique({ where: { clerkId: userId }, select: { role: true } })
   const currentUser = await prisma.user.update({
     where: { clerkId: userId },
     data: { role: "ADMIN" },
@@ -22,8 +25,8 @@ export default async function AdminDashboardPage() {
     redirect("/");
   }
 
-  // Εκτέλεση queries παράλληλα
-  const [reports, recentEvents, usersCount] = await Promise.all([
+  // Εκτέλεση queries παράλληλα (φέρνουμε και τους χρήστες με τα XP τους)
+  const [reports, recentEvents, users, usersCount] = await Promise.all([
     prisma.report.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "desc" },
@@ -33,6 +36,11 @@ export default async function AdminDashboardPage() {
       orderBy: { createdAt: "desc" },
       take: 10,
       include: { host: { select: { name: true } } },
+    }),
+    prisma.user.findMany({
+      orderBy: { xp: "desc" },
+      take: 15,
+      select: { id: true, name: true, xp: true },
     }),
     prisma.user.count(),
   ]);
@@ -132,19 +140,100 @@ export default async function AdminDashboardPage() {
                     Host: {event.host?.name || "Άγνωστος"}
                   </p>
                 </div>
-                <form
-                  action={async () => {
-                    "use server";
-                    await deleteEventAdminAction(event.id);
-                  }}
-                >
-                  <button className="px-3 py-1.5 bg-rose-950 text-rose-300 border border-rose-800 rounded-lg hover:bg-rose-900 transition text-xs">
-                    Διαγραφή
-                  </button>
-                </form>
+                <div className="flex items-center gap-2">
+                  {/* Ακύρωση Event */}
+                  <form
+                    action={async () => {
+                      "use server";
+                      await cancelEventAction(event.id);
+                    }}
+                  >
+                    <button className="px-3 py-1.5 bg-amber-950/60 text-amber-300 border border-amber-800 rounded-lg hover:bg-amber-900/60 transition text-xs">
+                      Ακύρωση
+                    </button>
+                  </form>
+
+                  {/* Οριστική Διαγραφή */}
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteEventAdminAction(event.id);
+                    }}
+                  >
+                    <button className="px-3 py-1.5 bg-rose-950 text-rose-300 border border-rose-800 rounded-lg hover:bg-rose-900 transition text-xs">
+                      Διαγραφή
+                    </button>
+                  </form>
+                </div>
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* ⚡ ΝΕΟ SECTION: Διαχείριση XP & Βαθμολογιών Παικτών */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h2 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+          <span>⚡ Διαχείριση XP & Leaderboard</span>
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto custom-scrollbar p-1">
+          {users.map((u) => (
+            <div
+              key={u.id}
+              className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-3"
+            >
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-sm text-slate-200 truncate">
+                  {u.name || "Unknown Player"}
+                </span>
+                <span className="text-xs font-mono font-bold text-amber-400 bg-amber-950/60 border border-amber-900/50 px-2 py-0.5 rounded">
+                  {u.xp} XP
+                </span>
+              </div>
+
+              {/* Φόρμες για Αφαίρεση / Προσθήκη XP */}
+              <div className="flex gap-2">
+                <form
+                  action={async (formData) => {
+                    "use server";
+                    const amount = Number(formData.get("amount") || 50);
+                    await updateUserXPAction(u.id, amount, "add");
+                  }}
+                  className="flex-1 flex gap-1"
+                >
+                  <input
+                    type="number"
+                    name="amount"
+                    defaultValue={50}
+                    className="w-14 bg-slate-900 border border-slate-700 rounded px-1 text-center text-xs text-white"
+                  />
+                  <button className="flex-1 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 py-1 rounded text-xs font-bold transition">
+                    +XP
+                  </button>
+                </form>
+
+                <form
+                  action={async (formData) => {
+                    "use server";
+                    const amount = Number(formData.get("amount") || 50);
+                    await updateUserXPAction(u.id, amount, "remove");
+                  }}
+                  className="flex-1 flex gap-1"
+                >
+                  <input
+                    type="number"
+                    name="amount"
+                    defaultValue={50}
+                    className="w-14 bg-slate-900 border border-slate-700 rounded px-1 text-center text-xs text-white"
+                  />
+                  <button className="flex-1 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 py-1 rounded text-xs font-bold transition">
+                    -XP
+                  </button>
+                </form>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

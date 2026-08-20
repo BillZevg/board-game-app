@@ -6,7 +6,7 @@ import Image from "next/image";
 export default async function Leaderboard() {
   const { userId: clerkId } = await auth();
 
-  // Φέρνουμε τους Top 10 παίκτες βάση XP
+  // Φέρνουμε τους Top 10 παίκτες βάσει XP
   const topPlayers = await prisma.user.findMany({
     orderBy: { xp: "desc" },
     take: 10,
@@ -84,13 +84,16 @@ export default async function Leaderboard() {
                   />
                 </div>
 
-                {/* Player Name */}
+                {/* Player Name & Rank Title */}
                 <div className="min-w-0">
                   <p
                     className={`text-xs font-bold truncate ${
                       isCurrentUser ? "text-purple-300" : "text-slate-200"
                     }`}
                   >
+                    {player.name || "Unknown Player"}
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate">
                     {playerRank.title}
                   </p>
                 </div>
