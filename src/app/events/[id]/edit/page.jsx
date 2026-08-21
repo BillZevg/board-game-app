@@ -85,42 +85,44 @@ export default async function EditEventPage({ params }) {
   const formattedDateTime = new Date(event.dateTime).toISOString().slice(0, 16);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-12 px-4">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-6 sm:py-12 px-3.5 sm:px-4">
+      <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8">
         {/* Back Link */}
         <Link
           href={`/events/${id}`}
-          className="inline-flex items-center gap-2 text-sm font-mono text-purple-400 hover:text-purple-300 transition group"
+          className="inline-flex items-center gap-2 text-sm font-mono text-purple-400 hover:text-purple-300 transition group min-h-[44px] sm:min-h-0"
         >
           <span className="group-hover:-translate-x-1 transition">←</span>{" "}
           Ακύρωση & Επιστροφή στο Session
         </Link>
 
         {/* --- FORM CARD --- */}
-        <div className="relative bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-md overflow-hidden">
+        <div className="relative bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-10 shadow-2xl backdrop-blur-md overflow-hidden">
           {/* Ambient Glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[90px] pointer-events-none rounded-full" />
 
           {/* Header */}
-          <div className="mb-8 border-b border-slate-800 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="mb-6 sm:mb-8 border-b border-slate-800 pb-5 sm:pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <span className="text-xs font-mono text-purple-400 uppercase tracking-widest block mb-1">
                 ⚙️ Tavern Master Settings
               </span>
-              <h1 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300">
+              <h1 className="text-xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300">
                 Επεξεργασία Τραπεζιού
               </h1>
             </div>
 
             {/* DELETE BUTTON (Client Component) */}
-            <DeleteEventButton deleteAction={deleteEvent} />
+            <div className="w-full sm:w-auto flex justify-end">
+              <DeleteEventButton deleteAction={deleteEvent} />
+            </div>
           </div>
 
           {/* Form */}
-          <form action={updateEvent} className="space-y-6">
+          <form action={updateEvent} className="space-y-4 sm:space-y-6">
             {/* Τίτλος / Παιχνίδι */}
             <div>
-              <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5 sm:mb-2">
                 🎲 Τίτλος Event / Όνομα Επιτραπεζίου *
               </label>
               <input
@@ -128,14 +130,14 @@ export default async function EditEventPage({ params }) {
                 name="title"
                 defaultValue={event.title}
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm font-medium"
+                className="w-full h-12 sm:h-11 bg-slate-950 border border-slate-800 rounded-xl px-4 text-base sm:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition font-medium"
               />
             </div>
 
             {/* Πόλη & Τοποθεσία */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5 sm:mb-2">
                   📍 Πόλη *
                 </label>
                 <input
@@ -143,12 +145,12 @@ export default async function EditEventPage({ params }) {
                   name="city"
                   defaultValue={event.city || ""}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm font-medium"
+                  className="w-full h-12 sm:h-11 bg-slate-950 border border-slate-800 rounded-xl px-4 text-base sm:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5 sm:mb-2">
                   🏰 Κατάστημα / Σημείο
                 </label>
                 <input
@@ -156,7 +158,7 @@ export default async function EditEventPage({ params }) {
                   name="location"
                   defaultValue={event.address || ""}
                   placeholder="π.χ. The Game Inn, Σπίτι"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm font-medium"
+                  className="w-full h-12 sm:h-11 bg-slate-950 border border-slate-800 rounded-xl px-4 text-base sm:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition font-medium"
                 />
               </div>
             </div>
@@ -164,7 +166,7 @@ export default async function EditEventPage({ params }) {
             {/* Ημερομηνία & Μέγιστοι Παίκτες */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5 sm:mb-2">
                   🕒 Ημερομηνία & Ώρα *
                 </label>
                 <input
@@ -172,12 +174,12 @@ export default async function EditEventPage({ params }) {
                   name="dateTime"
                   defaultValue={formattedDateTime}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm font-mono scheme-dark appearance-none cursor-pointer"
+                  className="w-full h-12 sm:h-11 bg-slate-950 border border-slate-800 rounded-xl px-4 text-base sm:text-sm text-slate-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition font-mono scheme-dark appearance-none cursor-pointer"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5 sm:mb-2">
                   👥 Μέγιστοι Παίκτες (Max Slots) *
                 </label>
                 <input
@@ -187,14 +189,14 @@ export default async function EditEventPage({ params }) {
                   max="20"
                   defaultValue={event.maxPlayers}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm font-medium"
+                  className="w-full h-12 sm:h-11 bg-slate-950 border border-slate-800 rounded-xl px-4 text-base sm:text-sm text-slate-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition font-medium"
                 />
               </div>
             </div>
 
             {/* Περιγραφή */}
             <div>
-              <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5 sm:mb-2">
                 📜 Περιγραφή & Κανόνες
               </label>
               <textarea
@@ -202,21 +204,21 @@ export default async function EditEventPage({ params }) {
                 rows="4"
                 defaultValue={event.description || ""}
                 placeholder="Γράψε λεπτομέρειες για το παιχνίδι..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm resize-none font-medium"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 sm:p-4 text-base sm:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition resize-none font-medium"
               ></textarea>
             </div>
 
-            {/* Submit Button */}
-            <div className="pt-4 flex items-center justify-end gap-3">
+            {/* Submit & Cancel Buttons */}
+            <div className="pt-4 border-t border-slate-800/80 flex flex-col-reverse sm:flex-row items-center justify-end gap-3">
               <Link
                 href={`/events/${id}`}
-                className="px-5 py-3.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-bold rounded-xl text-sm transition"
+                className="w-full sm:w-auto h-12 sm:h-11 px-5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-bold rounded-xl text-sm transition flex items-center justify-center min-h-[44px]"
               >
                 Ακύρωση
               </Link>
               <button
                 type="submit"
-                className="px-6 py-3.5 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-black rounded-xl text-sm shadow-xl shadow-purple-950/50 hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer flex items-center gap-2"
+                className="w-full sm:w-auto h-12 sm:h-11 px-6 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-black rounded-xl text-sm shadow-xl shadow-purple-950/50 active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2 min-h-[44px]"
               >
                 <span>✨</span> Αποθήκευση Αλλαγών
               </button>

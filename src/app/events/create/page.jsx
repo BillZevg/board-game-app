@@ -2,7 +2,6 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import DatePicker from "@/components/DateTimePicker";
 import CreateEventForm from "@/components/CreateEventForm";
 
 export default async function CreateEventPage() {
@@ -66,7 +65,7 @@ export default async function CreateEventPage() {
 
     let gameId = null;
 
-    // Αν επιλέχθηκε παιχνιδι απο BGG, βρες ή δημιούργησε το Game
+    // Αν επιλέχθηκε παιχνίδι από BGG, βρες ή δημιούργησε το Game
     if (bggId) {
       const existingGame = await prisma.game.findFirst({
         where: { bggId: parseInt(bggId) },
@@ -110,11 +109,11 @@ export default async function CreateEventPage() {
           hostId: user.id,
           imageUrl: bggImage,
           gameId: gameId,
-           minPlayers: bggMinPlayers ? parseInt(bggMinPlayers) : null,
-    playingTime: bggPlayingTime ? parseInt(bggPlayingTime) : null,
-    minAge: bggMinAge ? parseInt(bggMinAge) : null,
-    yearPublished: bggYearPublished ? parseInt(bggYearPublished) : null,
-    gameTitle: bggGameTitle || null,
+          minPlayers: bggMinPlayers ? parseInt(bggMinPlayers) : null,
+          playingTime: bggPlayingTime ? parseInt(bggPlayingTime) : null,
+          minAge: bggMinAge ? parseInt(bggMinAge) : null,
+          yearPublished: bggYearPublished ? parseInt(bggYearPublished) : null,
+          gameTitle: bggGameTitle || null,
           participants: {
             create: {
               userId: user.id,
@@ -136,32 +135,37 @@ export default async function CreateEventPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-12 px-4">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-6 sm:py-12 px-3.5 sm:px-4">
+      <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8">
+        {/* Back Link */}
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm font-mono text-purple-400 hover:text-purple-300 transition group"
+          className="inline-flex items-center gap-2 text-sm font-mono text-purple-400 hover:text-purple-300 transition group min-h-[44px] sm:min-h-0"
         >
           <span className="group-hover:-translate-x-1 transition">←</span>{" "}
           Επιστροφή στην Αρχική
         </Link>
 
-        <div className="relative bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-md overflow-hidden">
+        {/* --- FORM CARD --- */}
+        <div className="relative bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-10 shadow-2xl backdrop-blur-md overflow-hidden">
+          {/* Ambient Glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[90px] pointer-events-none rounded-full" />
 
-          <div className="mb-8 border-b border-slate-800 pb-6">
+          {/* Header */}
+          <div className="mb-6 sm:mb-8 border-b border-slate-800 pb-5 sm:pb-6">
             <span className="text-xs font-mono text-purple-400 uppercase tracking-widest block mb-1">
               ⚔️ Tavern Master
             </span>
-            <h1 className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300">
+            <h1 className="text-xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300">
               Δημιουργία Νέου Τραπεζιού
             </h1>
-            <p className="text-slate-400 text-sm mt-2">
+            <p className="text-slate-400 text-xs sm:text-sm mt-1.5 sm:mt-2">
               Συμπλήρωσε τις λεπτομέρειες του quest για να βρεις τους επόμενους
               συμπαίκτες σου!
             </p>
           </div>
 
+          {/* Form Component */}
           <CreateEventForm createEventAction={createEvent} />
         </div>
       </div>

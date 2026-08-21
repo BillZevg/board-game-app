@@ -59,14 +59,14 @@ export default function JoinButton({ eventId, userStatus, isFull }) {
 
   if (userStatus === "ACCEPTED") {
     return (
-      <div className="flex items-center gap-3">
-        <span className="px-3 py-2 bg-emerald-950/80 border border-emerald-800 text-emerald-400 font-mono text-xs font-bold rounded-xl">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+        <span className="px-3.5 py-2.5 bg-emerald-950/80 border border-emerald-800 text-emerald-400 font-mono text-xs font-bold rounded-xl flex items-center justify-center min-h-[44px]">
           ✓ Εγκεκριμένος Παίκτης
         </span>
         <button
           onClick={handleLeave}
           disabled={loading}
-          className="px-3 py-2 bg-slate-800 hover:bg-red-950/80 hover:text-red-400 border border-slate-700 rounded-xl font-mono text-xs text-slate-400 transition"
+          className="px-4 py-2.5 bg-slate-800 hover:bg-red-950/80 hover:text-red-400 active:scale-95 border border-slate-700 rounded-xl font-mono text-xs text-slate-400 transition flex items-center justify-center min-h-[44px] w-full sm:w-auto disabled:opacity-50"
         >
           {loading ? "..." : "Αποχώρηση"}
         </button>
@@ -76,14 +76,14 @@ export default function JoinButton({ eventId, userStatus, isFull }) {
 
   if (userStatus === "PENDING") {
     return (
-      <div className="flex items-center gap-3">
-        <span className="px-3 py-2 bg-amber-950/80 border border-amber-800 text-amber-400 font-mono text-xs font-bold rounded-xl">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+        <span className="px-3.5 py-2.5 bg-amber-950/80 border border-amber-800 text-amber-400 font-mono text-xs font-bold rounded-xl flex items-center justify-center min-h-[44px]">
           ⏳ Αίτημα σε αναμονή
         </span>
         <button
           onClick={handleLeave}
           disabled={loading}
-          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-mono text-xs text-slate-300 transition"
+          className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-xl font-mono text-xs text-slate-300 transition flex items-center justify-center min-h-[44px] w-full sm:w-auto disabled:opacity-50"
         >
           {loading ? "..." : "Ακύρωση"}
         </button>
@@ -93,14 +93,14 @@ export default function JoinButton({ eventId, userStatus, isFull }) {
 
   if (userStatus === "WAITLIST") {
     return (
-      <div className="flex items-center gap-3">
-        <span className="px-3 py-2 bg-purple-950/80 border border-purple-800 text-purple-300 font-mono text-xs font-bold rounded-xl flex items-center gap-1.5">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+        <span className="px-3.5 py-2.5 bg-purple-950/80 border border-purple-800 text-purple-300 font-mono text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 min-h-[44px]">
           <span>📋</span> Στη Λίστα Αναμονής
         </span>
         <button
           onClick={handleLeave}
           disabled={loading}
-          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-mono text-xs text-slate-300 transition"
+          className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-xl font-mono text-xs text-slate-300 transition flex items-center justify-center min-h-[44px] w-full sm:w-auto disabled:opacity-50"
         >
           {loading ? "..." : "Έξοδος από Λίστα"}
         </button>
@@ -110,18 +110,18 @@ export default function JoinButton({ eventId, userStatus, isFull }) {
 
   if (userStatus === "REJECTED") {
     return (
-      <span className="px-3 py-2 bg-red-950/80 border border-red-800 text-red-400 font-mono text-xs font-bold rounded-xl">
+      <span className="px-3.5 py-2.5 bg-red-950/80 border border-red-800 text-red-400 font-mono text-xs font-bold rounded-xl flex items-center justify-center min-h-[44px] w-full sm:w-auto">
         ✕ Το αίτημα απορρίφθηκε
       </span>
     );
   }
 
-  // Αρχικό Κουμπί (αν το τραπέζι είναι γεμάτο, εμφανίζεται ως "Μπες στη Waitlist")
+  // Αρχικό Κουμπί
   return (
     <button
       onClick={handleJoin}
       disabled={loading}
-      className={`px-5 py-2.5 font-mono text-xs font-bold rounded-xl transition shadow-lg ${
+      className={`w-full sm:w-auto px-5 py-3 font-mono text-xs font-bold rounded-xl transition shadow-lg active:scale-95 flex items-center justify-center min-h-[44px] disabled:opacity-50 ${
         isFull
           ? "bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/40"
           : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40"

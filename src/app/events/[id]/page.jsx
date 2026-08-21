@@ -1,3 +1,4 @@
+// app/events/[id]/page.jsx
 import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
@@ -24,6 +25,76 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+// --- Dynamic Metadata Function ---
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+
+  // Ανάκτηση των απαραίτητων στοιχείων για τα Open Graph / Twitter Cards
+  const event = await prisma.event.findUnique({
+    where: { id },
+    select: {
+      title: { title: true },
+      title: true,
+      description: true,
+      dateTime: true,
+      imageUrl: true,
+      city: true,
+      locationType: true,
+      gameTitle: true,
+      game: { select: { title: true, imageUrl: true } },
+    },
+  });
+
+  if (!event) {
+    return {
+      title: "Το Event δεν βρέθηκε | Tabletop Tavern",
+      description: "Το event που ψάχνετε δεν υπάρχει ή έχει διαγραφεί.",
+    };
+  }
+
+  const gameTitle = event.gameTitle || event.game?.title || "Board Game";
+  const eventImage =
+    event.imageUrl || event.game?.imageUrl || "/og-default.png";
+  const eventDate = event.dateTime ? new Date(event.dateTime) : null;
+  const formattedDate =
+    eventDate && !isNaN(eventDate.getTime())
+      ? eventDate.toLocaleDateString("el-GR")
+      : "Σύντομα";
+
+  const locationText =
+    event.locationType === "STORE" ? event.city || "In-Person" : "Online";
+
+  const descriptionText =
+    event.description?.slice(0, 150) ||
+    `Ελάτε να παίξουμε ${gameTitle}! Κάνε εγγραφή στο session.`;
+
+  return {
+    title: `${event.title} | Tabletop Tavern`,
+    description: `${gameTitle} • ${formattedDate} @ ${locationText}. ${descriptionText}`,
+    openGraph: {
+      title: `${event.title} | Tabletop Tavern`,
+      description: `Παίξε ${gameTitle}! Ημερομηνία: ${formattedDate}. Κάνε εγγραφή στο session!`,
+      url: `/events/${id}`,
+      type: "article",
+      images: [
+        {
+          url: eventImage,
+          width: 1200,
+          height: 630,
+          alt: event.title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: event.title,
+      description: `Παίξε ${gameTitle}! Κάνε εγγραφή στο session.`,
+      images: [eventImage],
+    },
+  };
+}
+
+// --- Main Event Page Component ---
 export default async function EventDetailPage({ params }) {
   const { id } = await params;
   const { userId: clerkId } = await auth();

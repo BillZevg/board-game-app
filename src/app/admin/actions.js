@@ -23,39 +23,54 @@ async function requireAdmin() {
 
 // 1. Διαγραφή Κακόβουλου Event
 export async function deleteEventAdminAction(eventId) {
-  await requireAdmin();
+  try {
+    await requireAdmin();
 
-  await prisma.event.delete({
-    where: { id: eventId },
-  });
+    await prisma.event.delete({
+      where: { id: eventId },
+    });
 
-  revalidatePath("/admin");
-  revalidatePath("/events");
-  return { success: true };
+    revalidatePath("/admin");
+    revalidatePath("/events");
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Σφάλμα διαγραφής event:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 // 2. Ban / Unban Χρήστη
 export async function toggleUserBanAction(targetUserId, isBanned) {
-  await requireAdmin();
+  try {
+    await requireAdmin();
 
-  await prisma.user.update({
-    where: { id: targetUserId },
-    data: { isBanned },
-  });
+    await prisma.user.update({
+      where: { id: targetUserId },
+      data: { isBanned },
+    });
 
-  revalidatePath("/admin");
-  return { success: true };
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Σφάλμα αλλαγής ban status:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 // 3. Επίλυση/Αλλαγή Status σε Report
 export async function resolveReportAction(reportId, status) {
-  await requireAdmin();
+  try {
+    await requireAdmin();
 
-  await prisma.report.update({
-    where: { id: reportId },
-    data: { status }, // "RESOLVED" | "DISMISSED"
-  });
+    await prisma.report.update({
+      where: { id: reportId },
+      data: { status }, // "RESOLVED" | "DISMISSED"
+    });
 
-  revalidatePath("/admin");
-  return { success: true };
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Σφάλμα ενημέρωσης report:", error);
+    return { success: false, error: error.message };
+  }
 }
