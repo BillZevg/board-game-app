@@ -348,7 +348,7 @@ export default async function HomePage({ searchParams }) {
                         className="font-bold text-cyan-400 hover:text-cyan-300 transition flex items-center gap-1 group-hover:translate-x-1 duration-200"
                       >
                         {isCompleted
-                          ? "Δες Quest →"
+                          ? "Δες το Quest →"
                           : isLive
                             ? "Μπες στο Τραπέζι →"
                             : "Join Session →"}
